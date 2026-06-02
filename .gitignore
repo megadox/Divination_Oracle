@@ -1,0 +1,33 @@
+# OS and editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Flutter and Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+coverage/
+pubspec.lock
+
+# Android and iOS generated files
+app/flutter_app/android/.gradle/
+app/flutter_app/android/local.properties
+app/flutter_app/ios/Pods/
+app/flutter_app/ios/.symlinks/
+app/flutter_app/ios/Flutter/ephemeral/
+app/flutter_app/ios/Flutter/Generated.xcconfig
+app/flutter_app/ios/Flutter/flutter_export_environment.sh
+
+# Supabase
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# Environment files
+.env
+.env.*
+!.env.example
