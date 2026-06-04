@@ -25,7 +25,24 @@
 - `flutter analyze`, `flutter test`, `flutter doctor` 통과 확인
 - Supabase CLI dev dependency 추가: `package.json`, `package-lock.json`
 - Deno는 설치되어 있으나 사용자 PATH 보정 필요: `C:\Users\megadox\.deno\bin`
-- 다음 작업: Supabase Cloud 연결 또는 Docker Desktop 실행 후 `npx supabase start`, Edge Function serve 검증
+- Android Studio에서는 `E:\Project\Divination_app\app\flutter_app` 폴더를 Flutter 프로젝트 루트로 오픈
+- 다음 작업:
+  1. Supabase Cloud 프로젝트 생성 및 `npx supabase link --project-ref ...` 연결
+  2. 초기 DB migration 적용: `npx supabase db push`
+  3. 테스트용 타로 seed 데이터 작성
+  4. Edge Function `create-free-reading`, `create-ai-reading`, `sync-revenuecat-subscription` 검증
+  5. Flutter 앱에 `SUPABASE_URL`, `SUPABASE_ANON_KEY`를 전달해 실제 무료 해석 흐름 테스트
+
+## 2026-06-04 Supabase 진행
+
+- Supabase Cloud 프로젝트 연결 후 `npx supabase db push` 진행
+- 테스트용 타로 seed migration 작성: `20260604000001_seed_test_tarot.sql`
+- Seed 범위: Major Arcana 테스트 카드 3장(`fool`, `magician`, `star`)
+- Seed 해석 범위: `general`, `love`, `career`, `money`, `health`, `relationship` 카테고리와 `upright`, `reversed` 방향
+- Web 플랫폼 추가 및 Chrome/web-server 실행 스크립트 작성: `scripts/run_flutter_web.ps1`
+- 로컬 Supabase 실행값은 `.env`에서 읽도록 구성하고, 커밋용 예시는 `.env.example`에 작성
+- `.env`는 로컬 설정으로 Git 추적 제외
+- 다음 작업: `npx supabase db push`로 seed migration 적용 확인 후 무료 해석 Edge Function 검증
 
 project/
  ├─ AGENTS.md
@@ -39,7 +56,10 @@ project/
  │   └─ decisions.md
  ├─ app/
  │   └─ flutter_app/
+ ├─ scripts/
+ │   └─ run_flutter_web.ps1
  └─ supabase/
      ├─ functions/
      └─ migrations/
-         └─ 20260602000001_initial_schema.sql
+         ├─ 20260602000001_initial_schema.sql
+         └─ 20260604000001_seed_test_tarot.sql
