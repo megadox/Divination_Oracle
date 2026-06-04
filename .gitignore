@@ -11,7 +11,9 @@ Thumbs.db
 .packages
 build/
 coverage/
-pubspec.lock
+
+# Node and Supabase CLI
+node_modules/
 
 # Android and iOS generated files
 app/flutter_app/android/.gradle/
