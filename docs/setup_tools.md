@@ -226,6 +226,36 @@ flutter test
 
 - `flutter analyze`: 통과
 - `flutter test`: 통과
+- `flutter build apk --debug`: 통과
+
+Android 실행 스크립트:
+
+```powershell
+cd E:\Project\Divination_app
+powershell -ExecutionPolicy Bypass -File scripts\run_flutter_android.ps1
+```
+
+특정 에뮬레이터나 기기를 지정하려면:
+
+```powershell
+flutter devices
+powershell -ExecutionPolicy Bypass -File scripts\run_flutter_android.ps1 -Device emulator-5554
+```
+
+Android Studio에서 직접 Run할 경우 `.env` 파일은 자동으로 읽히지 않는다. Run 설정에 dart define을 추가해야 한다.
+
+Android Studio:
+
+1. `Run`
+2. `Edit Configurations`
+3. Flutter 실행 설정 선택
+4. `Additional run args`에 아래 형식으로 입력
+
+```text
+--dart-define=SUPABASE_URL=https://ldumzdzylpuhdxpmnvrg.supabase.co --dart-define=SUPABASE_ANON_KEY=your-anon-or-publishable-key
+```
+
+`SUPABASE_URL`이 누락되면 앱에서 `/auth/v1/signup`처럼 host 없는 URL을 호출하며 인증 오류가 발생한다.
 
 ### Deno PATH 보정
 

@@ -7,6 +7,14 @@ class AuthRepository {
 
   User? get currentUser => _client.auth.currentUser;
 
+  Future<User> ensureAnonymousSession() async {
+    final existingUser = currentUser;
+    if (existingUser != null) {
+      return existingUser;
+    }
+    return signInAnonymously();
+  }
+
   Future<User> signInAnonymously() async {
     final response = await _client.auth.signInAnonymously();
     final user = response.user;

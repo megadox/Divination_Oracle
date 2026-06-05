@@ -25,7 +25,7 @@ Deno.serve(async (request) => {
     await ensurePlusUser(client, userId);
     await incrementDailyUsage(client, userId, 'ai_reading_count', 30);
 
-    const { divinationTypeId, selected } = await selectItems(client, readingRequest);
+    const { divinationTypeId, spread, selected } = await selectItems(client, readingRequest);
     const { data: prompt, error: promptError } = await client
       .from('prompt_templates')
       .select('*')
@@ -43,7 +43,9 @@ Deno.serve(async (request) => {
     const selectedItems = selected.map((entry) => ({
       name: entry.item.display_name ?? entry.item.name,
       orientation: entry.orientation,
+      position_code: entry.position_code,
       position: entry.position_name,
+      position_description: entry.position_description,
     }));
     const baseInterpretations = selected.map((entry) => entry.interpretation);
     const userPrompt = String(prompt.user_prompt_template)
@@ -79,6 +81,7 @@ Deno.serve(async (request) => {
       userId,
       readingRequest,
       divinationTypeId,
+      spread,
       selected,
       'plus_ai',
       resultText,
@@ -103,6 +106,10 @@ Deno.serve(async (request) => {
 
     return jsonResponse(reading);
   } catch (error) {
-    return jsonResponse({ error: String(error?.message ?? error) }, 400);
+    return jsonResponse({ error: errorMessage(error) }, 400);
   }
 });
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

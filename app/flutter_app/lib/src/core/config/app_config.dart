@@ -7,4 +7,8 @@ class AppConfig {
 
   static const freeDailyLimit = 5;
   static const plusAiDailyLimit = 30;
+
+  static bool get hasSupabaseConfig {
+    return supabaseUrl.trim().isNotEmpty && supabaseAnonKey.trim().isNotEmpty;
+  }
 }

@@ -8,29 +8,59 @@ export type ReadingRequest = {
   language_code?: string;
 };
 
+export type SpreadDefinition = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  card_count: number;
+  allow_reversed: boolean;
+};
+
+export type SpreadPosition = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  position_order: number;
+};
+
 export type SelectedItem = {
   item: Record<string, unknown>;
   orientation: 'upright' | 'reversed' | 'none';
+  spread_position_id: string | null;
+  position_code: string;
   position_name: string;
+  position_description: string | null;
   position_order: number;
   interpretation: Record<string, unknown>;
+};
+
+export type SelectionResult = {
+  divinationTypeId: string;
+  spread: SpreadDefinition;
+  positions: SpreadPosition[];
+  selected: SelectedItem[];
 };
 
 export function normalizeRequest(body: Partial<ReadingRequest>): ReadingRequest {
   return {
     divination_type_code: body.divination_type_code ?? 'tarot',
-    spread_code: body.spread_code ?? 'single',
+    spread_code: normalizeSpreadCode(body.spread_code),
     category: body.category ?? 'general',
     question: body.question ?? '',
     language_code: body.language_code ?? 'ko',
   };
 }
 
-export function spreadCount(spreadCode: string): number {
-  if (spreadCode === 'three_card') {
-    return 3;
+function normalizeSpreadCode(spreadCode?: string): string {
+  if (spreadCode === 'single') {
+    return 'single_question';
   }
-  return 1;
+  if (spreadCode === 'three_card') {
+    return 'three_card_timeline';
+  }
+  return spreadCode ?? 'single_question';
 }
 
 export async function incrementDailyUsage(
@@ -94,7 +124,7 @@ export async function ensurePlusUser(client: SupabaseClient, userId: string) {
 export async function selectItems(
   client: SupabaseClient,
   request: ReadingRequest,
-): Promise<{ divinationTypeId: string; selected: SelectedItem[] }> {
+): Promise<SelectionResult> {
   const { data: divinationType, error: typeError } = await client
     .from('divination_types')
     .select('id,code')
@@ -104,6 +134,32 @@ export async function selectItems(
 
   if (typeError) {
     throw typeError;
+  }
+
+  const { data: spread, error: spreadError } = await client
+    .from('spreads')
+    .select('id,code,name,description,card_count,allow_reversed')
+    .eq('divination_type_id', divinationType.id)
+    .eq('code', request.spread_code)
+    .eq('is_active', true)
+    .single();
+
+  if (spreadError) {
+    throw spreadError;
+  }
+
+  const { data: positions, error: positionsError } = await client
+    .from('spread_positions')
+    .select('id,code,name,description,position_order')
+    .eq('spread_id', spread.id)
+    .eq('is_active', true)
+    .order('position_order');
+
+  if (positionsError) {
+    throw positionsError;
+  }
+  if (!positions?.length) {
+    throw new Error('No active spread positions found.');
   }
 
   const { data: items, error: itemsError } = await client
@@ -118,14 +174,20 @@ export async function selectItems(
   if (!items?.length) {
     throw new Error('No active divination items found.');
   }
+  if (items.length < positions.length) {
+    throw new Error(
+      `Not enough active divination items for spread ${spread.code}. ` +
+      `Need ${positions.length}, found ${items.length}.`,
+    );
+  }
 
-  const count = spreadCount(request.spread_code ?? 'single');
-  const shuffled = [...items].sort(() => Math.random() - 0.5).slice(0, count);
+  const shuffled = [...items].sort(() => Math.random() - 0.5).slice(0, positions.length);
   const selected: SelectedItem[] = [];
 
   for (let index = 0; index < shuffled.length; index += 1) {
     const item = shuffled[index];
-    const orientation = request.divination_type_code === 'tarot'
+    const position = positions[index];
+    const orientation = request.divination_type_code === 'tarot' && spread.allow_reversed
       ? (Math.random() > 0.5 ? 'upright' : 'reversed')
       : 'none';
 
@@ -146,9 +208,10 @@ export async function selectItems(
     selected.push({
       item,
       orientation,
-      position_name: count === 3
-        ? ['past', 'present', 'future'][index]
-        : 'single',
+      spread_position_id: position.id,
+      position_code: position.code,
+      position_name: position.name,
+      position_description: position.description,
       position_order: index,
       interpretation: interpretation ?? {
         summary: '등록된 기본 해석을 준비 중입니다.',
@@ -159,7 +222,12 @@ export async function selectItems(
     });
   }
 
-  return { divinationTypeId: divinationType.id, selected };
+  return {
+    divinationTypeId: divinationType.id,
+    spread: spread as SpreadDefinition,
+    positions: positions as SpreadPosition[],
+    selected,
+  };
 }
 
 export function composeFreeText(selected: SelectedItem[]): string {
@@ -168,7 +236,8 @@ export function composeFreeText(selected: SelectedItem[]): string {
       const itemName = entry.item.display_name ?? entry.item.name;
       const interpretation = entry.interpretation;
       return [
-        `${itemName} (${entry.orientation})`,
+        `[${entry.position_name}] ${itemName} (${entry.orientation})`,
+        entry.position_description,
         interpretation.summary,
         interpretation.detail,
         interpretation.advice ? `조언: ${interpretation.advice}` : null,
@@ -183,6 +252,7 @@ export async function saveReading(
   userId: string,
   request: ReadingRequest,
   divinationTypeId: string,
+  spread: SpreadDefinition,
   selected: SelectedItem[],
   resultType: 'free' | 'plus_ai',
   resultText: string,
@@ -193,6 +263,7 @@ export async function saveReading(
     .insert({
       user_id: userId,
       divination_type_id: divinationTypeId,
+      spread_id: spread.id,
       spread_code: request.spread_code,
       question: request.question,
       category: request.category,
@@ -212,6 +283,7 @@ export async function saveReading(
   const readingItems = selected.map((entry) => ({
     reading_id: reading.id,
     item_id: entry.item.id,
+    spread_position_id: entry.spread_position_id,
     orientation: entry.orientation,
     position_name: entry.position_name,
     position_order: entry.position_order,

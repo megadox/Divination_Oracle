@@ -6,6 +6,7 @@ MVP DB는 무료 해석과 Plus AI 해석을 분리한다.
 
 - `profiles`, `subscriptions`, `daily_usage`: 사용자, 구독 상태, 일일 사용량 제한
 - `divination_types`, `divination_items`, `interpretations`: 무료 지식창고와 AI 프롬프트 기반 데이터
+- `spreads`, `spread_positions`: 타로 리딩 방식과 카드 위치 의미
 - `readings`, `reading_items`: 사용자 점술 실행 기록
 - `ai_results`, `prompt_templates`: Plus AI 해석 결과와 프롬프트 버전 관리
 
@@ -66,6 +67,16 @@ RevenueCat 구독 상태 캐시다.
 
 카드, 룬, 오미쿠지 결과 같은 점술 항목이다.
 
+타로 카드 이미지는 `image_url` 컬럼을 재사용하되, 외부 URL 대신 Flutter 로컬 asset 참조를 저장할 수 있다.
+
+예:
+
+```text
+asset://tarot/rws_major/fool.jpg
+```
+
+Flutter 앱은 위 값을 `assets/tarot/rws_major/fool.jpg`로 변환해 `Image.asset`으로 표시한다.
+
 ### interpretations
 
 무료 사용자에게 제공되는 고정 해석이며, Plus AI 해석의 참고 지식으로도 사용한다.
@@ -78,6 +89,32 @@ RevenueCat 구독 상태 캐시다.
 - `summary`, `detail`, `advice`, `warning`
 - `language_code`
 
+### spreads
+
+타로 리딩 방식이다. 모든 스프레드는 UI에서 일단 제한 없이 보여준다.
+
+주요 컬럼:
+
+- `divination_type_id`
+- `code`: `single_question`, `three_card_timeline`, `celtic_cross` 등
+- `name`
+- `description`
+- `card_count`
+- `is_plus_only`
+- `allow_reversed`
+
+### spread_positions
+
+스프레드 안에서 각 카드가 놓이는 위치 의미다.
+
+주요 컬럼:
+
+- `spread_id`
+- `code`: `past`, `present`, `future`, `advice` 등
+- `name`
+- `description`
+- `position_order`
+
 ### readings
 
 사용자의 점술 실행 기록이다.
@@ -87,6 +124,7 @@ RevenueCat 구독 상태 캐시다.
 - `user_id`
 - `divination_type_id`
 - `spread_code`
+- `spread_id`
 - `question`
 - `category`
 - `result_type`: `free`, `plus_ai`
@@ -96,6 +134,15 @@ RevenueCat 구독 상태 캐시다.
 ### reading_items
 
 한 번의 점술에서 선택된 항목 목록이다.
+
+주요 컬럼:
+
+- `reading_id`
+- `item_id`
+- `spread_position_id`
+- `orientation`
+- `position_name`
+- `position_order`
 
 ### ai_results
 

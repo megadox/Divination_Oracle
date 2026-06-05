@@ -21,7 +21,7 @@ class AuthController extends AutoDisposeAsyncNotifier<void> {
     }
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      await repository.signInAnonymously();
+      await repository.ensureAnonymousSession();
     });
   }
 }

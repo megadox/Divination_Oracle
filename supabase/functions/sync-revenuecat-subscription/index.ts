@@ -46,9 +46,13 @@ Deno.serve(async (request) => {
 
     return jsonResponse({ ok: true });
   } catch (error) {
-    return jsonResponse({ error: String(error?.message ?? error) }, 400);
+    return jsonResponse({ error: errorMessage(error) }, 400);
   }
 });
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 function mapRevenueCatStatus(type?: string): 'active' | 'trial' | 'expired' | 'cancelled' {
   switch (type) {
