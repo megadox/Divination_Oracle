@@ -88,6 +88,55 @@
 - 무료 리딩 검증: `single_question`, `three_card_timeline`, `celtic_cross` 생성 성공
 - 다음 작업: Android 앱에서 스프레드 선택 UI와 결과 화면 직접 확인, AI 모드 Plus 검증/구독 처리 흐름 설계
 
+## 2026-06-07
+
+- 다른 PC에서 Android 모바일 에뮬레이터가 정상 실행되는 것을 확인했다.
+- 현재 PC는 메모리 사용량과 디스크 공간 부족으로 에뮬레이터/Gradle 빌드가 불안정할 수 있으므로, Android 검증은 리소스가 충분한 PC 또는 실제 Android 기기에서 우선 진행한다.
+- 웹 실행에서는 기본 무료 리딩 흐름이 정상 동작하는 것으로 확인했다.
+- Android 실행 시에는 `.env`가 Android Studio Run에 자동 전달되지 않으므로, `scripts/run_flutter_android.ps1`을 사용하거나 Android Studio Run Configuration의 Additional run args에 `SUPABASE_URL`, `SUPABASE_ANON_KEY` dart define을 직접 넣어야 한다.
+
+### 에뮬레이터 실행 확인 이후 진행할 일
+
+1. Android 앱 실행 검증
+   - `scripts/run_flutter_android.ps1` 또는 Android Studio Run Configuration으로 Android 앱을 실행한다.
+   - 앱 시작, Supabase 초기화, 무료 리딩 생성, 카드 이미지 표시, 결과 화면 표시, 뒤로가기/재실행 흐름을 확인한다.
+   - 확인 명령 예시:
+     ```powershell
+     .\scripts\run_flutter_android.ps1 -Device <device-id>
+     ```
+
+2. Android 무료 리딩 end-to-end 검증
+   - `single_question`, `three_card_timeline`, `celtic_cross` 스프레드를 Android에서 각각 실행한다.
+   - 질문/분야/스프레드 선택값이 Edge Function 요청과 DB 저장 결과에 반영되는지 확인한다.
+   - Supabase에서 `readings`, `reading_items`, `daily_usage` 테이블 기록을 확인한다.
+
+3. Android UI/이미지 검증
+   - Major Arcana 카드 이미지가 `asset://tarot/rws_major/<card_code>.jpg` 기반으로 정상 표시되는지 확인한다.
+   - 작은 화면에서 카드 목록, 해석 텍스트, 버튼 영역이 겹치지 않는지 확인한다.
+   - 긴 질문/긴 해석 문구에서도 스크롤과 줄바꿈이 자연스러운지 확인한다.
+
+4. 인증/사용량 정책 확인
+   - 익명 사용자 흐름을 계속 사용할지, 로그인 기반으로 전환할지 결정한다.
+   - 무료 일일 사용량 제한이 Android에서도 동일하게 적용되는지 확인한다.
+   - Supabase Auth Anonymous sign-ins 설정 상태를 다시 확인한다.
+
+5. Plus/AI 기능 검증 준비
+   - Edge Function secrets에 `OPENAI_API_KEY`, `OPENAI_MODEL`, `SUPABASE_SERVICE_ROLE_KEY`, `REVENUECAT_WEBHOOK_SECRET`이 설정되어 있는지 확인한다.
+   - Plus가 아닌 사용자가 AI 리딩을 요청했을 때 차단되는지 확인한다.
+   - 테스트용 Plus 구독 상태를 DB에 넣고 `create-ai-reading` 흐름을 검증한다.
+
+6. RevenueCat 구독 흐름 설계/검증
+   - RevenueCat entitlement id, product id, webhook URL을 확정한다.
+   - `sync-revenuecat-subscription` webhook payload 테스트를 진행한다.
+   - Supabase `subscriptions` 테이블에 구독 상태가 upsert되는지 확인한다.
+
+7. 릴리즈 전 품질 점검
+   - `flutter analyze`
+   - `flutter test`
+   - `flutter build apk --debug`
+   - Android 실기기 또는 에뮬레이터에서 무료 리딩 회귀 테스트
+   - `.env.example`, `docs/setup_tools.md`, Android Studio 실행 설정 문서 최신화
+
 project/
  ├─ AGENTS.md
  ├─ README.md
