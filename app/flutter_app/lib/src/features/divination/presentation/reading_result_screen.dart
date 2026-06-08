@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/supabase/supabase_providers.dart';
 import '../domain/reading.dart';
@@ -97,6 +98,11 @@ class ReadingResultScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
               ],
               Text(value.reading.resultText ?? '저장된 해석이 없습니다.'),
+              const SizedBox(height: 24),
+              FilledButton.tonal(
+                onPressed: () => context.pop(),
+                child: const Text('새 해석하기'),
+              ),
             ],
           ),
           error: (error, stackTrace) => Center(child: Text('$error')),

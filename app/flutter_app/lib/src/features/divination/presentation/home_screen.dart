@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/constants/usage_limits.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/divination_providers.dart';
+import '../data/reading_error_message.dart';
+import '../domain/daily_usage.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -28,6 +31,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final spreads = ref.watch(tarotSpreadsProvider);
+    final usage = ref.watch(dailyUsageProvider);
+    final dailyUsage = usage.maybeWhen(
+      data: (value) => value,
+      orElse: () => DailyUsage.empty,
+    );
+    final isFreeLimitReached = !_useAi && dailyUsage.isFreeLimitReached;
+    final canSubmit = !_isSubmitting && !isFreeLimitReached;
 
     return Scaffold(
       appBar: AppBar(
@@ -35,12 +45,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         actions: [
           IconButton(
             tooltip: 'History',
-            onPressed: () => context.go('/history'),
+            onPressed: () => context.push('/history'),
             icon: const Icon(Icons.history),
           ),
           IconButton(
             tooltip: 'Plus',
-            onPressed: () => context.go('/plus'),
+            onPressed: () => context.push('/plus'),
             icon: const Icon(Icons.auto_awesome),
           ),
         ],
@@ -63,6 +73,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 hintText: '궁금한 일을 짧게 적어주세요.',
               ),
             ),
+            const SizedBox(height: 12),
+            _DailyUsageBanner(usage: usage, useAi: _useAi),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _category,
@@ -142,10 +154,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: _isSubmitting ? null : _createReading,
+              onPressed: canSubmit ? _createReading : null,
               icon: Icon(_useAi ? Icons.auto_awesome : Icons.style),
               label: Text(_useAi ? 'AI 타로 해석' : '무료 타로 해석'),
             ),
+            if (isFreeLimitReached) ...[
+              const SizedBox(height: 12),
+              Text(
+                dailyLimitReachedMessage(),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+              ),
+            ],
             const SizedBox(height: 16),
             spreads.when(
               data: (items) => Column(
@@ -186,13 +207,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               question: _questionController.text,
               spreadCode: _spreadCode,
             );
+      ref.invalidate(dailyUsageProvider);
       if (mounted) {
-        context.go('/result/${reading.id}');
+        context.push('/result/${reading.id}');
       }
     } catch (error) {
+      ref.invalidate(dailyUsageProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('해석을 생성하지 못했습니다: $error')),
+          SnackBar(content: Text(readingErrorMessage(error))),
         );
       }
     } finally {
@@ -200,5 +223,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+}
+
+class _DailyUsageBanner extends StatelessWidget {
+  const _DailyUsageBanner({
+    required this.usage,
+    required this.useAi,
+  });
+
+  final AsyncValue<DailyUsage> usage;
+  final bool useAi;
+
+  @override
+  Widget build(BuildContext context) {
+    if (useAi) {
+      return const SizedBox.shrink();
+    }
+
+    return usage.when(
+      data: (value) {
+        final remaining = value.remainingFreeReadings;
+        final isLimitReached = value.isFreeLimitReached;
+        return Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  isLimitReached ? Icons.hourglass_empty : Icons.style,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isLimitReached
+                        ? '오늘 무료 해석 ${UsageLimits.freeDailyReadingLimit}회를 모두 사용했습니다.'
+                        : '오늘 남은 무료 해석: $remaining/${UsageLimits.freeDailyReadingLimit}회',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      error: (_, __) => const SizedBox.shrink(),
+      loading: () => const SizedBox.shrink(),
+    );
   }
 }

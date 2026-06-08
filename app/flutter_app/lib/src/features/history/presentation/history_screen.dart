@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/supabase/supabase_providers.dart';
 import '../../divination/domain/reading.dart';
@@ -31,7 +32,8 @@ class HistoryScreen extends ConsumerWidget {
             final item = items[index];
             return ListTile(
               title: Text(item.question?.isNotEmpty == true ? item.question! : '질문 없음'),
-              subtitle: Text(item.resultType),
+              subtitle: Text('${item.spreadCode} · ${item.resultType}'),
+              onTap: () => context.push('/result/${item.id}'),
             );
           },
         ),

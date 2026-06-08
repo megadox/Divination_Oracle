@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../domain/daily_usage.dart';
 import '../domain/divination_type.dart';
 import '../domain/reading.dart';
 import '../domain/tarot_spread.dart';
@@ -32,6 +33,20 @@ class DivinationRepository {
         .eq('is_active', true)
         .order('sort_order');
     return rows.map(TarotSpread.fromJson).toList();
+  }
+
+  Future<DailyUsage> fetchTodayUsage() async {
+    final today = DateTime.now().toIso8601String().split('T').first;
+    final row = await _client
+        .from('daily_usage')
+        .select('free_reading_count,ai_reading_count')
+        .eq('usage_date', today)
+        .maybeSingle();
+
+    if (row == null) {
+      return DailyUsage.empty;
+    }
+    return DailyUsage.fromJson(row);
   }
 
   Future<Reading> createFreeReading({

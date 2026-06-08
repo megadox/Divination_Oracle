@@ -20,7 +20,7 @@ Deno.serve(async (request) => {
     const body = await request.json();
     const readingRequest = normalizeRequest(body);
 
-    await incrementDailyUsage(client, userId, 'free_reading_count', 5);
+    await incrementDailyUsage(client, userId, 'free_reading_count', 10);
     const { divinationTypeId, spread, selected } = await selectItems(client, readingRequest);
     const resultText = composeFreeText(selected);
     const reading = await saveReading(

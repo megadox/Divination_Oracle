@@ -95,20 +95,32 @@
 - 웹 실행에서는 기본 무료 리딩 흐름이 정상 동작하는 것으로 확인했다.
 - Android 실행 시에는 `.env`가 Android Studio Run에 자동 전달되지 않으므로, `scripts/run_flutter_android.ps1`을 사용하거나 Android Studio Run Configuration의 Additional run args에 `SUPABASE_URL`, `SUPABASE_ANON_KEY` dart define을 직접 넣어야 한다.
 
+## 2026-06-08
+
+- Android 앱 실행 검증 완료: 에뮬레이터에서 앱 시작 및 기본 화면 표시 확인
+- 뒤로가기 이슈 원인 확인: `context.go()`가 라우트 스택을 교체해 결과/기록/Plus 화면에서도 홈으로 돌아가지 못하고 앱이 종료됨
+- 네비게이션 수정: 결과/기록/Plus 이동을 `context.push()`로 변경, 결과 화면에 `새 해석하기` 버튼 추가, 기록 화면에서 결과 상세로 이동 가능
+- Android 무료 리딩 API end-to-end 검증 스크립트 추가: `scripts/test_android_free_reading_e2e.ps1`
+- API 검증 결과: `single_question`(1장), `three_card_timeline`(3장), `celtic_cross`(10장) 생성 성공, `readings`/`reading_items`/`daily_usage` 반영 확인
+- `flutter analyze`, `flutter test` 통과
+- 다음 작업: Android 에뮬레이터에서 수정된 뒤로가기 흐름과 UI 카드 이미지 직접 확인
+- 무료 해석 일일 제한(5회) 도달 시 `Daily usage limit reached` 오류 확인
+- 홈 화면에 남은 무료 해석 횟수 표시, 한도 도달 시 버튼 비활성화 및 한국어 안내 메시지 추가
+
 ### 에뮬레이터 실행 확인 이후 진행할 일
 
-1. Android 앱 실행 검증
+1. ~~Android 앱 실행 검증~~ (완료)
    - `scripts/run_flutter_android.ps1` 또는 Android Studio Run Configuration으로 Android 앱을 실행한다.
    - 앱 시작, Supabase 초기화, 무료 리딩 생성, 카드 이미지 표시, 결과 화면 표시, 뒤로가기/재실행 흐름을 확인한다.
    - 확인 명령 예시:
      ```powershell
      .\scripts\run_flutter_android.ps1 -Device <device-id>
      ```
+   - 참고: 홈 화면에서 뒤로가기를 누르면 앱이 종료되는 것은 Android 기본 동작이다. 결과/기록/Plus 화면에서는 뒤로가기로 홈으로 돌아가야 한다.
 
 2. Android 무료 리딩 end-to-end 검증
-   - `single_question`, `three_card_timeline`, `celtic_cross` 스프레드를 Android에서 각각 실행한다.
-   - 질문/분야/스프레드 선택값이 Edge Function 요청과 DB 저장 결과에 반영되는지 확인한다.
-   - Supabase에서 `readings`, `reading_items`, `daily_usage` 테이블 기록을 확인한다.
+   - API 검증은 `scripts/test_android_free_reading_e2e.ps1`로 완료
+   - Android UI에서 `single_question`, `three_card_timeline`, `celtic_cross` 스프레드를 각각 실행해 카드 이미지와 해석 표시를 직접 확인한다.
 
 3. Android UI/이미지 검증
    - Major Arcana 카드 이미지가 `asset://tarot/rws_major/<card_code>.jpg` 기반으로 정상 표시되는지 확인한다.
