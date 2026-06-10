@@ -1,5 +1,5 @@
 param(
-  [string]$SupabaseUrl = "https://ldumzdzylpuhdxpmnvrg.supabase.co",
+  [string]$SupabaseUrl = "",
   [string]$SupabaseAnonKey = $env:SUPABASE_ANON_KEY,
   [ValidateSet("chrome", "edge", "web-server")]
   [string]$Device = "chrome",
