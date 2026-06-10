@@ -26,7 +26,15 @@
 - Major Arcana 22장
 - Minor Arcana 56장
 
-MVP에서는 먼저 Major Arcana 22장으로 시작하고, 이후 78장 전체로 확장한다.
+MVP에서는 Major Arcana 22장으로 시작했고, 현재는 Minor Arcana 56장까지 포함한 **78장 전체** 덱을 사용한다.
+
+### 카드 코드 규칙
+
+- Major: `fool`, `magician`, `star` 등 (`metadata.arcana = major`)
+- Minor: `{suit}_{rank}` 예) `wands_ace`, `cups_knight`, `pentacles_ten` (`metadata.arcana = minor`)
+- 이미지:
+  - Major: `asset://tarot/rws_major/<code>.jpg`
+  - Minor: `asset://tarot/rws_minor/<code>.jpg`
 
 ### 방향
 

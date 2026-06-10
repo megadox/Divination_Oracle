@@ -10,10 +10,14 @@ class DailyUsage {
   final int aiReadingCount;
 
   int get remainingFreeReadings =>
+      !UsageLimits.isFreeReadingLimitEnabled
+          ? UsageLimits.freeDailyReadingLimit
+          :
       (UsageLimits.freeDailyReadingLimit - freeReadingCount)
           .clamp(0, UsageLimits.freeDailyReadingLimit);
 
   bool get isFreeLimitReached =>
+      UsageLimits.isFreeReadingLimitEnabled &&
       freeReadingCount >= UsageLimits.freeDailyReadingLimit;
 
   factory DailyUsage.fromJson(Map<String, dynamic> json) {

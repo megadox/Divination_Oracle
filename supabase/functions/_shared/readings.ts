@@ -69,6 +69,7 @@ export async function incrementDailyUsage(
   field: 'free_reading_count' | 'ai_reading_count',
   limit: number,
 ) {
+  const enforceLimit = shouldEnforceUsageLimit(field);
   const today = new Date().toISOString().slice(0, 10);
   const { data: current, error: fetchError } = await client
     .from('daily_usage')
@@ -82,7 +83,7 @@ export async function incrementDailyUsage(
   }
 
   const currentCount = current?.[field] ?? 0;
-  if (currentCount >= limit) {
+  if (enforceLimit && currentCount >= limit) {
     throw new Error('Daily usage limit reached.');
   }
 
@@ -102,6 +103,16 @@ export async function incrementDailyUsage(
   if (error) {
     throw error;
   }
+}
+
+function shouldEnforceUsageLimit(
+  field: 'free_reading_count' | 'ai_reading_count',
+): boolean {
+  if (field !== 'free_reading_count') {
+    return true;
+  }
+
+  return Deno.env.get('DISABLE_FREE_READING_LIMIT') !== 'true';
 }
 
 export async function ensurePlusUser(client: SupabaseClient, userId: string) {

@@ -184,6 +184,9 @@ class _TarotCardImage extends StatelessWidget {
     final imageRef = card.imageUrl;
     if (imageRef != null && imageRef.isNotEmpty) {
       final assetPath = _localAssetPath(imageRef);
+      debugPrint(
+        '[TarotImage] code=${card.cardCode} imageRef=$imageRef assetPath=$assetPath',
+      );
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: assetPath == null
@@ -191,6 +194,9 @@ class _TarotCardImage extends StatelessWidget {
                 imageRef,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
+                  debugPrint(
+                    '[TarotImage] network load failed code=${card.cardCode} imageRef=$imageRef error=$error',
+                  );
                   return _FallbackTarotCard(card: card);
                 },
               )
@@ -198,11 +204,15 @@ class _TarotCardImage extends StatelessWidget {
                 assetPath,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
+                  debugPrint(
+                    '[TarotImage] asset load failed code=${card.cardCode} assetPath=$assetPath error=$error',
+                  );
                   return _FallbackTarotCard(card: card);
                 },
               ),
       );
     }
+    debugPrint('[TarotImage] missing imageRef code=${card.cardCode}');
     return _FallbackTarotCard(card: card);
   }
 }

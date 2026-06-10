@@ -62,6 +62,17 @@ powershell -ExecutionPolicy Bypass -File scripts\test_free_reading.ps1
 
 ## create-ai-reading
 
+검증 스크립트:
+
+```powershell
+cd E:\Project\Divination_app
+powershell -ExecutionPolicy Bypass -File scripts\test_ai_reading.ps1
+```
+
+- 1단계: Plus가 아닌 사용자는 `Plus subscription is required.`로 차단되는지 확인한다.
+- 2단계: `.env`에 `SUPABASE_SERVICE_ROLE_KEY`를 넣으면 테스트용 `subscriptions` 행을 upsert한 뒤 실제 AI 해석 생성까지 확인한다.
+- OpenAI secret이 없으면 2단계에서 OpenAI 관련 오류가 난다. Dashboard > Edge Functions > Secrets에서 `OPENAI_API_KEY`, `OPENAI_MODEL`을 확인한다.
+
 처리:
 
 1. 사용자 확인

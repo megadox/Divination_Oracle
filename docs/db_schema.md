@@ -73,9 +73,12 @@ RevenueCat 구독 상태 캐시다.
 
 ```text
 asset://tarot/rws_major/fool.jpg
+asset://tarot/rws_minor/wands_ace.jpg
 ```
 
-Flutter 앱은 위 값을 `assets/tarot/rws_major/fool.jpg`로 변환해 `Image.asset`으로 표시한다.
+Flutter 앱은 위 값을 `assets/tarot/rws_major/fool.jpg`, `assets/tarot/rws_minor/wands_ace.jpg`로 변환해 `Image.asset`으로 표시한다.
+
+타로 덱은 Major Arcana 22장 + Minor Arcana 56장 = **78장**이다. Minor 카드 코드는 `{suit}_{rank}` 형식을 사용한다.
 
 ### interpretations
 

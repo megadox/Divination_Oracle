@@ -95,7 +95,17 @@
 - 웹 실행에서는 기본 무료 리딩 흐름이 정상 동작하는 것으로 확인했다.
 - Android 실행 시에는 `.env`가 Android Studio Run에 자동 전달되지 않으므로, `scripts/run_flutter_android.ps1`을 사용하거나 Android Studio Run Configuration의 Additional run args에 `SUPABASE_URL`, `SUPABASE_ANON_KEY` dart define을 직접 넣어야 한다.
 
-## 2026-06-08
+## 2026-06-09
+
+- Minor Arcana 56장 추가: 전체 78장 타로 덱 지원
+- migration `20260608000001_seed_minor_arcana.sql`: `divination_items` 56장 + `interpretations` 672행 seed
+- migration `20260608000002_add_minor_arcana_asset_paths.sql`: `asset://tarot/rws_minor/<code>.jpg` 경로 설정
+- 로컬 이미지 56장 추가: `app/flutter_app/assets/tarot/rws_minor/`
+- 다운로드 스크립트: `scripts/download_tarot_minor_assets.ps1`, 생성 스크립트: `scripts/generate_minor_arcana_seed.py`
+- `pubspec.yaml`에 `assets/tarot/rws_minor/` 등록
+- 카드 코드 규칙: `{suit}_{rank}` (예: `wands_ace`, `cups_knight`, `pentacles_king`)
+- `npx supabase db push`로 원격 DB 적용 완료
+- Edge Function `selectItems`는 별도 수정 없이 78장 풀에서 랜덤 추첨
 
 - Android 앱 실행 검증 완료: 에뮬레이터에서 앱 시작 및 기본 화면 표시 확인
 - 뒤로가기 이슈 원인 확인: `context.go()`가 라우트 스택을 교체해 결과/기록/Plus 화면에서도 홈으로 돌아가지 못하고 앱이 종료됨
@@ -103,9 +113,17 @@
 - Android 무료 리딩 API end-to-end 검증 스크립트 추가: `scripts/test_android_free_reading_e2e.ps1`
 - API 검증 결과: `single_question`(1장), `three_card_timeline`(3장), `celtic_cross`(10장) 생성 성공, `readings`/`reading_items`/`daily_usage` 반영 확인
 - `flutter analyze`, `flutter test` 통과
-- 다음 작업: Android 에뮬레이터에서 수정된 뒤로가기 흐름과 UI 카드 이미지 직접 확인
 - 무료 해석 일일 제한(5회) 도달 시 `Daily usage limit reached` 오류 확인
 - 홈 화면에 남은 무료 해석 횟수 표시, 한도 도달 시 버튼 비활성화 및 한국어 안내 메시지 추가
+- Android 무료 리딩 end-to-end 검증 완료: `single_question`, `three_card_timeline`, `celtic_cross` UI에서 정상 동작 확인
+- Android UI/이미지 검증 완료: `asset://tarot/rws_major/` 카드 이미지, 레이아웃, 스크롤/줄바꿈 정상 확인
+- 인증/사용량 정책 확인 완료: MVP는 익명 로그인 유지, Plus 전환 시 로그인 유도는 후속 구현
+- 사용량 정책 확정: 무료 해석 5회/일, AI 해석 30회/일(Plus), Android·서버·UI 동작 일치 확인
+- Supabase Anonymous sign-ins 활성화 상태 확인: Android 무료 리딩 정상 동작으로 검증됨
+- Plus/AI 기능 검증 준비 완료: `scripts/test_ai_reading.ps1` 추가, 비Plus 사용자 AI 요청 차단 확인
+- Edge Function secrets 체크리스트 정리: `docs/edge_functions.md`, Dashboard에서 `OPENAI_API_KEY`, `OPENAI_MODEL`, `SUPABASE_SERVICE_ROLE_KEY`, `REVENUECAT_WEBHOOK_SECRET` 확인 필요
+- Plus AI 생성 end-to-end는 `.env`에 `SUPABASE_SERVICE_ROLE_KEY` 추가 후 `scripts/test_ai_reading.ps1` 재실행으로 OpenAI 호출까지 검증
+- 다음 작업: RevenueCat 구독 흐름 설계/검증
 
 ### 에뮬레이터 실행 확인 이후 진행할 일
 
@@ -118,24 +136,27 @@
      ```
    - 참고: 홈 화면에서 뒤로가기를 누르면 앱이 종료되는 것은 Android 기본 동작이다. 결과/기록/Plus 화면에서는 뒤로가기로 홈으로 돌아가야 한다.
 
-2. Android 무료 리딩 end-to-end 검증
+2. ~~Android 무료 리딩 end-to-end 검증~~ (완료)
    - API 검증은 `scripts/test_android_free_reading_e2e.ps1`로 완료
    - Android UI에서 `single_question`, `three_card_timeline`, `celtic_cross` 스프레드를 각각 실행해 카드 이미지와 해석 표시를 직접 확인한다.
 
-3. Android UI/이미지 검증
+3. ~~Android UI/이미지 검증~~ (완료)
    - Major Arcana 카드 이미지가 `asset://tarot/rws_major/<card_code>.jpg` 기반으로 정상 표시되는지 확인한다.
    - 작은 화면에서 카드 목록, 해석 텍스트, 버튼 영역이 겹치지 않는지 확인한다.
    - 긴 질문/긴 해석 문구에서도 스크롤과 줄바꿈이 자연스러운지 확인한다.
 
-4. 인증/사용량 정책 확인
+4. ~~인증/사용량 정책 확인~~ (완료)
    - 익명 사용자 흐름을 계속 사용할지, 로그인 기반으로 전환할지 결정한다.
    - 무료 일일 사용량 제한이 Android에서도 동일하게 적용되는지 확인한다.
    - Supabase Auth Anonymous sign-ins 설정 상태를 다시 확인한다.
 
-5. Plus/AI 기능 검증 준비
+5. ~~Plus/AI 기능 검증 준비~~ (완료)
    - Edge Function secrets에 `OPENAI_API_KEY`, `OPENAI_MODEL`, `SUPABASE_SERVICE_ROLE_KEY`, `REVENUECAT_WEBHOOK_SECRET`이 설정되어 있는지 확인한다.
    - Plus가 아닌 사용자가 AI 리딩을 요청했을 때 차단되는지 확인한다.
    - 테스트용 Plus 구독 상태를 DB에 넣고 `create-ai-reading` 흐름을 검증한다.
+   - 검증 스크립트: `scripts/test_ai_reading.ps1`
+   - 비Plus 차단 확인: `Plus subscription is required.` 응답 PASS
+   - Plus+OpenAI 전체 검증: `.env`에 `SUPABASE_SERVICE_ROLE_KEY` 설정 후 스크립트 재실행
 
 6. RevenueCat 구독 흐름 설계/검증
    - RevenueCat entitlement id, product id, webhook URL을 확정한다.

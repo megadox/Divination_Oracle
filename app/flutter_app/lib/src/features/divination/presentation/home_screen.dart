@@ -243,6 +243,24 @@ class _DailyUsageBanner extends StatelessWidget {
 
     return usage.when(
       data: (value) {
+        if (!UsageLimits.isFreeReadingLimitEnabled) {
+          return const Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.developer_mode, size: 20),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text('개발 모드에서는 무료 해석 횟수 제한을 적용하지 않습니다.'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         final remaining = value.remainingFreeReadings;
         final isLimitReached = value.isFreeLimitReached;
         return Card(
