@@ -6,6 +6,7 @@ export type ReadingRequest = {
   category?: string;
   question?: string;
   language_code?: string;
+  inputs?: Record<string, unknown>;
 };
 
 export type SpreadDefinition = {
@@ -38,29 +39,51 @@ export type SelectedItem = {
 
 export type SelectionResult = {
   divinationTypeId: string;
+  divinationTypeCode: string;
+  inputMode: string;
+  resolverType: string;
   spread: SpreadDefinition;
   positions: SpreadPosition[];
   selected: SelectedItem[];
 };
 
 export function normalizeRequest(body: Partial<ReadingRequest>): ReadingRequest {
+  const inputs = body.inputs && typeof body.inputs === 'object'
+    ? body.inputs as Record<string, unknown>
+    : {};
+  const divinationTypeCode = body.divination_type_code ?? 'tarot';
+  const normalizedSpreadCode = normalizeSpreadCode(body.spread_code, divinationTypeCode);
+
+  if (normalizedSpreadCode) {
+    inputs.spread_code ??= normalizedSpreadCode;
+  }
+
   return {
-    divination_type_code: body.divination_type_code ?? 'tarot',
-    spread_code: normalizeSpreadCode(body.spread_code),
+    divination_type_code: divinationTypeCode,
+    spread_code: normalizedSpreadCode,
     category: body.category ?? 'general',
     question: body.question ?? '',
     language_code: body.language_code ?? 'ko',
+    inputs,
   };
 }
 
-function normalizeSpreadCode(spreadCode?: string): string {
+function normalizeSpreadCode(
+  spreadCode?: string,
+  divinationTypeCode = 'tarot',
+): string {
   if (spreadCode === 'single') {
     return 'single_question';
   }
   if (spreadCode === 'three_card') {
     return 'three_card_timeline';
   }
-  return spreadCode ?? 'single_question';
+  if (spreadCode) {
+    return spreadCode;
+  }
+  return divinationTypeCode === 'tarot'
+    ? 'single_question'
+    : `${divinationTypeCode}_basic`;
 }
 
 export async function incrementDailyUsage(
@@ -138,13 +161,18 @@ export async function selectItems(
 ): Promise<SelectionResult> {
   const { data: divinationType, error: typeError } = await client
     .from('divination_types')
-    .select('id,code')
+    .select('id,code,input_mode,resolver_type')
     .eq('code', request.divination_type_code)
     .eq('is_active', true)
     .single();
 
   if (typeError) {
     throw typeError;
+  }
+  if (divinationType.input_mode !== 'draw_based') {
+    throw new Error(
+      `Divination type ${request.divination_type_code} is not supported by the draw-based reader.`,
+    );
   }
 
   const { data: spread, error: spreadError } = await client
@@ -235,10 +263,31 @@ export async function selectItems(
 
   return {
     divinationTypeId: divinationType.id,
+    divinationTypeCode: divinationType.code,
+    inputMode: divinationType.input_mode,
+    resolverType: divinationType.resolver_type,
     spread: spread as SpreadDefinition,
     positions: positions as SpreadPosition[],
     selected,
   };
+}
+
+export async function getDivinationType(
+  client: SupabaseClient,
+  code: string,
+) {
+  const { data, error } = await client
+    .from('divination_types')
+    .select('id,code,input_mode,resolver_type')
+    .eq('code', code)
+    .eq('is_active', true)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }
 
 export function composeFreeText(selected: SelectedItem[]): string {
@@ -263,19 +312,25 @@ export async function saveReading(
   userId: string,
   request: ReadingRequest,
   divinationTypeId: string,
-  spread: SpreadDefinition,
+  spread: SpreadDefinition | null,
   selected: SelectedItem[],
   resultType: 'free' | 'plus_ai',
   resultText: string,
   resultJson: Record<string, unknown> = {},
+  payloads: Array<{
+    payload_type: string;
+    payload_json: Record<string, unknown>;
+  }> = [],
 ) {
+  const spreadId = spread?.id ?? null;
+  const spreadCode = request.spread_code ?? spread?.code ?? `${request.divination_type_code}_basic`;
   const { data: reading, error: readingError } = await client
     .from('readings')
     .insert({
       user_id: userId,
       divination_type_id: divinationTypeId,
-      spread_id: spread.id,
-      spread_code: request.spread_code,
+      spread_id: spreadId,
+      spread_code: spreadCode,
       question: request.question,
       category: request.category,
       result_type: resultType,
@@ -300,10 +355,50 @@ export async function saveReading(
     position_order: entry.position_order,
   }));
 
-  const { error: itemsError } = await client.from('reading_items').insert(readingItems);
-  if (itemsError) {
-    throw itemsError;
+  if (readingItems.length > 0) {
+    const { error: itemsError } = await client.from('reading_items').insert(readingItems);
+    if (itemsError) {
+      throw itemsError;
+    }
+  }
+
+  const readingInputs = buildReadingInputs(reading.id, request);
+  if (readingInputs.length > 0) {
+    const { error: inputsError } = await client
+      .from('reading_inputs')
+      .insert(readingInputs);
+    if (inputsError) {
+      throw inputsError;
+    }
+  }
+
+  if (payloads.length > 0) {
+    const { error: payloadError } = await client
+      .from('reading_payloads')
+      .insert(
+        payloads.map((entry) => ({
+          reading_id: reading.id,
+          payload_type: entry.payload_type,
+          payload_json: entry.payload_json,
+        })),
+      );
+    if (payloadError) {
+      throw payloadError;
+    }
   }
 
   return reading;
+}
+
+function buildReadingInputs(readingId: string, request: ReadingRequest) {
+  const inputs = request.inputs ?? {};
+
+  return Object.entries(inputs)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([fieldKey, value]) => ({
+      reading_id: readingId,
+      field_key: fieldKey,
+      field_value: typeof value === 'string' ? value : null,
+      field_value_json: value,
+    }));
 }

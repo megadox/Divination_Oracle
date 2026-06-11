@@ -7,6 +7,7 @@ class Reading {
     required this.category,
     required this.spreadCode,
     this.question,
+    this.resultJson,
   });
 
   final String id;
@@ -16,6 +17,7 @@ class Reading {
   final String category;
   final String spreadCode;
   final String? question;
+  final Map<String, dynamic>? resultJson;
 
   factory Reading.fromJson(Map<String, dynamic> json) {
     return Reading(
@@ -26,6 +28,9 @@ class Reading {
       category: (json['category'] ?? 'general') as String,
       spreadCode: (json['spread_code'] ?? 'single_question') as String,
       createdAt: DateTime.parse(json['created_at'] as String),
+      resultJson: json['result_json'] is Map<String, dynamic>
+          ? json['result_json'] as Map<String, dynamic>
+          : null,
     );
   }
 }

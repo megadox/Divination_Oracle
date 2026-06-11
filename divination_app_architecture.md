@@ -1,684 +1,91 @@
-# 글로벌 점술 서비스 앱 상세 아키텍처
+# 글로벌 점술 서비스 앱 확장 아키텍처
 
-## 1. 프로젝트 개요
+## 1. 문서 목적
 
-본 문서는 타로를 시작으로 전 세계의 다양한 점술 서비스를 제공하는 모바일 앱의 상세 아키텍처를 정의한다.
+본 문서는 기존 타로 중심 구조를 다수 점술 플랫폼 구조로 확장하기 위한 설계 문서이다.
 
-서비스의 핵심 방향은 다음과 같다.
+확장 대상 예시:
 
-> 무료 사용자는 사전에 구축된 점술 지식창고 기반의 기본 해석을 제공받고, Plus 사용자는 AI를 활용한 개인화 해석을 제공받는다.
+- 타로
+- 사주
+- 룬
+- 오미쿠지
+- 별자리
 
-초기 MVP는 타로 중심으로 구현하고, 이후 룬, 오미쿠지, 주역, 사주, 별자리, 베다 점성술 등으로 확장한다.
+핵심 목표는 다음과 같다.
+
+1. 점술이 늘어나도 앱 구조를 다시 갈아엎지 않도록 공통 구조를 만든다.
+2. 무료 해석과 Plus AI 해석을 모든 점술에서 일관되게 분리한다.
+3. 카드형 점술과 입력형 점술을 모두 수용할 수 있는 구조로 바꾼다.
+4. 홈 화면에서 사용자가 점술을 선택하고 진입할 수 있는 UX로 전환한다.
 
 ---
 
-## 2. 서비스 구조
+## 2. 기존 구조의 한계
 
-### 2.1 사용자 등급 구조
+기존 구조는 타로를 중심으로 설계되어 있어 다음 문제가 있다.
+
+1. 화면 구조가 `tarot_reading_screen` 같은 점술별 개별 화면 중심이다.
+2. DB가 카드/룬 같은 "항목 뽑기형" 점술에 유리하고, 사주처럼 "입력값 계산형" 점술에는 맞지 않는다.
+3. 무료 결과 생성 로직이 "카드 선택 -> 해석 조회" 흐름에 치우쳐 있다.
+4. AI 프롬프트 구조가 타로 중심이며, 점술 종류별 입력 차이를 충분히 반영하지 못한다.
+
+따라서 앞으로는 `타로 앱`이 아니라 `점술 카탈로그 + 점술 엔진 앱` 구조로 바꾸는 것이 필요하다.
+
+---
+
+## 3. 목표 구조 요약
+
+### 3.1 설계 원칙
+
+- 점술 메타데이터와 점술 실행 로직을 분리한다.
+- 점술별 UI는 허용하되, 공통 진입/결과/기록 구조는 재사용한다.
+- 점술 타입마다 `입력 방식`, `결과 생성 방식`, `해석 방식`을 설정으로 관리한다.
+- AI 호출은 반드시 Plus 사용자에게만 허용한다.
+- 무료 결과는 DB 기반 또는 계산 결과 기반의 고정 해석으로 제공한다.
+
+### 3.2 점술 분류 방식
+
+점술은 내부적으로 아래 두 축으로 분류한다.
+
+#### A. 입력 방식 기준
+
+- `draw_based`: 항목을 뽑는 방식
+  - 타로, 룬, 오미쿠지
+- `birth_data_based`: 생년월일/시간 등 사용자 입력 기반
+  - 사주, 별자리
+- `hybrid`: 입력값 + 계산 + 룰셋 조합
+  - 향후 주역, 베다 점성술 등
+
+#### B. 결과 생성 방식 기준
+
+- `prewritten_lookup`: DB 해석 조회형
+- `rule_based`: 계산 규칙 기반 조합형
+- `lookup_plus_ai`: DB 해석 + Plus AI 확장형
+- `rule_plus_ai`: 계산 결과 + Plus AI 확장형
+
+---
+
+## 4. 서비스 구조
+
+### 4.1 사용자 등급 구조
 
 | 구분 | 무료 사용자 | Plus 사용자 |
 |---|---|---|
-| 점술 유형 | 일부 제공 | 전체 제공 |
-| 타로 해석 | 기본 해석 제공 | AI 개인화 해석 제공 |
-| 질문 입력 | 가능 | 가능 |
-| AI 해석 | 제한 또는 미제공 | 제공 |
-| 일일 이용 횟수 | 제한 | 확장 또는 무제한 |
-| 광고 | 표시 가능 | 제거 |
+| 이용 가능 점술 | 일부 또는 제한 제공 | 전체 제공 |
+| 기본 해석 | 제공 | 제공 |
+| AI 개인화 해석 | 미제공 | 제공 |
 | 기록 저장 | 제한 | 전체 저장 |
-| 여러 점술 통합 분석 | 미제공 | 제공 |
-
----
-
-### 2.2 무료 버전 구조
-
-무료 버전은 AI API 비용을 최소화하기 위해 DB에 저장된 해석 데이터를 사용한다.
-
-예시 흐름:
-
-1. 사용자가 질문을 입력한다.
-2. 사용자가 타로 카드를 선택하거나 앱이 랜덤으로 카드를 뽑는다.
-3. 선택된 카드, 방향, 질문 카테고리에 맞는 해석을 DB에서 조회한다.
-4. 정해진 템플릿에 따라 결과를 보여준다.
-
-무료 결과 예시:
-
-```text
-카드: The Fool
-방향: 정방향
-분야: 직업
-
-새로운 시작과 도전을 의미합니다.
-현재 상황은 가능성이 있지만 준비가 부족할 수 있습니다.
-충동적인 결정은 피하고, 계획을 세운 뒤 움직이는 것이 좋습니다.
-```
-
----
-
-### 2.3 Plus 버전 구조
-
-Plus 버전은 사용자 질문, 선택된 점술 결과, 지식창고 데이터를 AI 프롬프트에 포함하여 개인화 해석을 생성한다.
-
-예시 흐름:
-
-1. 사용자가 질문을 입력한다.
-2. 카드 또는 점술 결과가 생성된다.
-3. DB에서 기본 해석 데이터를 조회한다.
-4. 사용자 질문과 기본 해석을 AI 프롬프트에 넣는다.
-5. AI가 자연스러운 상담형 해석을 생성한다.
-6. 결과를 저장하고 사용자에게 보여준다.
-
-Plus 결과 예시:
-
-```text
-질문: 지금 회사를 그만두고 이직을 준비해도 될까요?
-카드: The Fool, The Star, The Magician
-
-새로운 시작의 가능성이 강하게 보입니다.
-다만 The Fool은 준비 없는 출발을 경고하기도 합니다.
-현재 회사를 즉시 그만두기보다는, 이직 준비와 포트폴리오 정리를 먼저 진행하는 것이 좋습니다.
-The Magician은 이미 필요한 능력을 어느 정도 갖추고 있음을 의미하므로, 준비 기간을 가진다면 더 좋은 기회를 만들 수 있습니다.
-```
-
----
-
-## 3. 추천 기술 구조
-
-## 3.1 전체 기술 스택
-
-| 영역 | 추천 기술 | 선택 이유 |
-|---|---|---|
-| 모바일 앱 | Flutter | iOS/Android 동시 개발, UI 품질 우수 |
-| 백엔드 | Supabase | 인증, DB, Storage, Edge Function 제공 |
-| 데이터베이스 | PostgreSQL | Supabase 기본 DB, 확장성 우수 |
-| AI 해석 | OpenAI API | Plus 사용자 개인화 해석 생성 |
-| 결제/구독 | RevenueCat | 앱스토어/플레이스토어 구독 통합 관리 |
-| 이미지 저장 | Supabase Storage | 카드 이미지, 점술 이미지 저장 |
-| 관리자 페이지 | Supabase Studio 또는 Flutter Web | 초기 관리 기능 빠르게 구현 |
-| 푸시 알림 | Firebase Cloud Messaging | 오늘의 운세, 재방문 유도 |
-| 분석 | Firebase Analytics / Amplitude | 사용자 행동 분석 |
-
----
-
-## 3.2 전체 시스템 구성도
-
-```text
-[Flutter App]
-     |
-     | Auth / API / DB Query
-     v
-[Supabase]
-     |
-     | PostgreSQL
-     | Storage
-     | Edge Functions
-     v
-[Knowledge DB]
-
-[Flutter App]
-     |
-     | Plus User Only
-     v
-[Supabase Edge Function]
-     |
-     | Secure API Call
-     v
-[OpenAI API]
-
-[Flutter App]
-     |
-     | Subscription Check
-     v
-[RevenueCat]
-     |
-     v
-[App Store / Google Play Billing]
-```
-
----
-
-## 4. 핵심 기능 모듈
-
-### 4.1 사용자 모듈
-
-기능:
-
-- 익명 사용자 시작
-- 이메일 로그인
-- Google/Apple 로그인
-- 사용자 프로필
-- 무료/Plus 상태 확인
-- 일일 사용량 제한
-
-초기에는 로그인 없이 시작할 수 있게 하는 것이 좋다.
-
-권장 방식:
-
-```text
-앱 설치 → 익명 사용자 생성 → 무료 체험 → Plus 전환 시 로그인 유도
-```
-
----
-
-### 4.2 점술 유형 모듈
-
-초기 MVP 점술 유형:
-
-1. 타로
-2. 룬
-3. 오미쿠지
-
-확장 점술 유형:
-
-1. 사주
-2. 주역
-3. 별자리
-4. 베다 점성술
-5. 마야 달력
-6. 이파
-7. 오검
-
----
-
-### 4.3 지식창고 모듈
-
-지식창고는 무료 해석과 AI 해석의 기반 데이터로 사용된다.
-
-저장 대상:
-
-- 점술 유형
-- 카드/상징/괘/룬 정보
-- 기본 의미
-- 분야별 의미
-- 정방향/역방향 의미
-- 조언
-- 경고
-- 키워드
-- 이미지
-- 난이도
-- 문화권/기원 정보
-
----
-
-### 4.4 무료 해석 모듈
-
-무료 해석은 AI를 사용하지 않고 DB 템플릿을 조합한다.
-
-예시 조합 방식:
-
-```text
-[카드 요약]
-+ [분야별 해석]
-+ [조언]
-+ [주의사항]
-```
-
-무료 해석 장점:
-
-- API 비용 없음
-- 빠른 응답
-- 결과 품질 통제 가능
-- 앱스토어 심사 리스크 감소
-
----
-
-### 4.5 Plus AI 해석 모듈
-
-Plus AI 해석은 Supabase Edge Function을 통해서만 OpenAI API를 호출한다.
+| 일일 사용량 | 제한 | 확장 |
+| 광고 | 표시 가능 | 제거 |
+| 고급 통합 해석 | 미제공 | 제공 가능 |
 
 중요 원칙:
 
-- 앱에서 OpenAI API Key 직접 호출 금지
-- Supabase Edge Function에서 API Key 보관
-- Plus 사용자 여부 확인 후 AI 호출
-- 호출 내역 저장
-- 비용 추적
+- 무료와 Plus의 차이는 "점술 종류"뿐 아니라 "해석 깊이"에서도 구분한다.
+- 같은 점술이라도 무료는 고정 해석, Plus는 AI 개인화 해석으로 분리한다.
 
-AI 해석 입력 데이터:
-
-```json
-{
-  "user_question": "이직해도 될까요?",
-  "divination_type": "tarot",
-  "selected_items": ["The Fool", "The Star", "The Magician"],
-  "base_interpretations": [...],
-  "category": "career",
-  "language": "ko"
-}
-```
-
-AI 해석 출력 데이터:
-
-```json
-{
-  "summary": "새로운 시작의 가능성이 있습니다.",
-  "detailed_reading": "현재 상황에서는 무작정 움직이기보다 준비가 중요합니다...",
-  "advice": "퇴사 전 포트폴리오와 재정 계획을 먼저 준비하세요.",
-  "caution": "충동적인 결정은 피하는 것이 좋습니다."
-}
-```
-
----
-
-## 5. DB 구조
-
-## 5.1 ERD 개요
-
-```text
-users
- └── readings
-      ├── reading_items
-      └── ai_results
-
-divination_types
- └── divination_items
-      └── interpretations
-
-subscriptions
-usage_limits
-prompts
-```
-
----
-
-## 5.2 테이블 설계
-
-### users
-
-사용자 정보를 저장한다.
-
-```sql
-create table users (
-    id uuid primary key,
-    email text,
-    display_name text,
-    provider text,
-    is_anonymous boolean default true,
-    language_code text default 'ko',
-    created_at timestamp default now(),
-    updated_at timestamp default now()
-);
-```
-
----
-
-### divination_types
-
-점술 유형을 저장한다.
-
-```sql
-create table divination_types (
-    id uuid primary key default gen_random_uuid(),
-    code text unique not null,
-    name text not null,
-    description text,
-    origin_region text,
-    is_active boolean default true,
-    sort_order int default 0,
-    created_at timestamp default now()
-);
-```
-
-예시 데이터:
-
-```text
-tarot, Tarot, 서양 타로
-rune, Rune, 북유럽 룬
-omikuji, Omikuji, 일본 오미쿠지
-```
-
----
-
-### divination_items
-
-카드, 룬, 괘, 오미쿠지 결과 등 점술 항목을 저장한다.
-
-```sql
-create table divination_items (
-    id uuid primary key default gen_random_uuid(),
-    divination_type_id uuid references divination_types(id),
-    code text not null,
-    name text not null,
-    display_name text,
-    image_url text,
-    keywords text[],
-    order_no int default 0,
-    is_active boolean default true,
-    created_at timestamp default now()
-);
-```
-
-타로 예시:
-
-```text
-fool, The Fool, 바보, 시작/자유/모험
-magician, The Magician, 마법사, 능력/실행/창조
-```
-
----
-
-### interpretations
-
-무료 해석용 기본 데이터를 저장한다.
-
-```sql
-create table interpretations (
-    id uuid primary key default gen_random_uuid(),
-    item_id uuid references divination_items(id),
-    orientation text default 'none',
-    category text default 'general',
-    summary text not null,
-    detail text,
-    advice text,
-    warning text,
-    keywords text[],
-    language_code text default 'ko',
-    created_at timestamp default now(),
-    updated_at timestamp default now()
-);
-```
-
-orientation 예시:
-
-```text
-upright
-reversed
-none
-```
-
-category 예시:
-
-```text
-general
-love
-career
-money
-health
-relationship
-```
-
----
-
-### readings
-
-사용자의 점술 실행 기록을 저장한다.
-
-```sql
-create table readings (
-    id uuid primary key default gen_random_uuid(),
-    user_id uuid references users(id),
-    divination_type_id uuid references divination_types(id),
-    question text,
-    category text default 'general',
-    result_type text default 'free',
-    result_text text,
-    is_ai_generated boolean default false,
-    language_code text default 'ko',
-    created_at timestamp default now()
-);
-```
-
-result_type 예시:
-
-```text
-free
-plus_ai
-```
-
----
-
-### reading_items
-
-한 번의 점술에서 선택된 카드/룬/항목을 저장한다.
-
-```sql
-create table reading_items (
-    id uuid primary key default gen_random_uuid(),
-    reading_id uuid references readings(id),
-    item_id uuid references divination_items(id),
-    orientation text default 'none',
-    position_name text,
-    position_order int default 0,
-    created_at timestamp default now()
-);
-```
-
-타로 3장 배열 예시:
-
-```text
-past
-present
-future
-```
-
----
-
-### ai_results
-
-AI 해석 결과와 비용 추적 정보를 저장한다.
-
-```sql
-create table ai_results (
-    id uuid primary key default gen_random_uuid(),
-    reading_id uuid references readings(id),
-    model_name text,
-    prompt_tokens int,
-    completion_tokens int,
-    total_tokens int,
-    prompt_text text,
-    result_json jsonb,
-    created_at timestamp default now()
-);
-```
-
----
-
-### subscriptions
-
-사용자의 구독 상태를 저장한다.
-
-```sql
-create table subscriptions (
-    id uuid primary key default gen_random_uuid(),
-    user_id uuid references users(id),
-    provider text default 'revenuecat',
-    product_id text,
-    status text,
-    current_period_start timestamp,
-    current_period_end timestamp,
-    created_at timestamp default now(),
-    updated_at timestamp default now()
-);
-```
-
-status 예시:
-
-```text
-active
-expired
-cancelled
-trial
-```
-
----
-
-### usage_limits
-
-무료 사용자와 Plus 사용자의 사용량을 관리한다.
-
-```sql
-create table usage_limits (
-    id uuid primary key default gen_random_uuid(),
-    user_id uuid references users(id),
-    usage_date date not null,
-    free_reading_count int default 0,
-    ai_reading_count int default 0,
-    created_at timestamp default now(),
-    updated_at timestamp default now(),
-    unique(user_id, usage_date)
-);
-```
-
----
-
-### prompts
-
-AI 프롬프트 템플릿을 관리한다.
-
-```sql
-create table prompts (
-    id uuid primary key default gen_random_uuid(),
-    code text unique not null,
-    name text not null,
-    system_prompt text not null,
-    user_prompt_template text not null,
-    language_code text default 'ko',
-    version int default 1,
-    is_active boolean default true,
-    created_at timestamp default now(),
-    updated_at timestamp default now()
-);
-```
-
----
-
-## 6. API / Edge Function 설계
-
-### 6.1 get-divination-types
-
-점술 유형 목록을 반환한다.
-
-```text
-GET /functions/v1/get-divination-types
-```
-
-응답:
-
-```json
-[
-  {
-    "code": "tarot",
-    "name": "Tarot",
-    "description": "서양 타로 카드 점술"
-  }
-]
-```
-
----
-
-### 6.2 create-free-reading
-
-무료 점술 결과를 생성한다.
-
-```text
-POST /functions/v1/create-free-reading
-```
-
-요청:
-
-```json
-{
-  "user_id": "uuid",
-  "divination_type": "tarot",
-  "question": "이직해도 될까요?",
-  "category": "career",
-  "spread_type": "three_card"
-}
-```
-
-처리:
-
-1. 사용량 확인
-2. 카드 랜덤 선택
-3. 해석 DB 조회
-4. 템플릿 조합
-5. readings 저장
-6. 결과 반환
-
----
-
-### 6.3 create-ai-reading
-
-Plus 사용자용 AI 점술 결과를 생성한다.
-
-```text
-POST /functions/v1/create-ai-reading
-```
-
-처리:
-
-1. 사용자 구독 상태 확인
-2. AI 사용량 확인
-3. 카드 또는 점술 항목 생성
-4. 기본 해석 조회
-5. AI 프롬프트 생성
-6. OpenAI API 호출
-7. 결과 저장
-8. 사용량 업데이트
-9. 결과 반환
-
----
-
-### 6.4 get-reading-history
-
-사용자의 점술 기록을 조회한다.
-
-```text
-GET /functions/v1/get-reading-history?user_id={user_id}
-```
-
----
-
-### 6.5 check-subscription
-
-RevenueCat 구독 상태를 확인한다.
-
-```text
-POST /functions/v1/check-subscription
-```
-
----
-
-## 7. Flutter 앱 화면 구조
-
-### 7.1 화면 목록
-
-```text
-/lib
-  /screens
-    splash_screen.dart
-    home_screen.dart
-    divination_select_screen.dart
-    tarot_reading_screen.dart
-    rune_reading_screen.dart
-    omikuji_screen.dart
-    result_screen.dart
-    ai_result_screen.dart
-    history_screen.dart
-    subscription_screen.dart
-    settings_screen.dart
-
-  /widgets
-    mystic_card.dart
-    divination_button.dart
-    result_section.dart
-    premium_banner.dart
-
-  /services
-    supabase_service.dart
-    reading_service.dart
-    subscription_service.dart
-    analytics_service.dart
-
-  /models
-    divination_type.dart
-    divination_item.dart
-    reading.dart
-    interpretation.dart
-```
-
----
-
-### 7.2 주요 화면 흐름
+### 4.2 공통 사용자 흐름
 
 ```text
 Splash
@@ -687,336 +94,908 @@ Home
   ↓
 점술 선택
   ↓
+점술 소개 / 이용 조건 확인
+  ↓
 질문 입력
   ↓
-카드/룬 선택 또는 랜덤 뽑기
+점술별 입력 단계
+  ├─ 타로: 카드 뽑기
+  ├─ 룬: 룬 뽑기
+  ├─ 오미쿠지: 제비 뽑기
+  ├─ 사주: 생년월일/시간/성별 입력
+  └─ 별자리: 생년월일 입력
   ↓
-무료 결과 화면
+무료 결과 생성
   ↓
-Plus AI 해석 유도
+결과 화면
   ↓
-구독 화면
+Plus AI 해석 보기
   ↓
-AI 개인화 결과
+구독 또는 AI 결과
 ```
 
 ---
 
-## 8. 디자인 방향
+## 5. 핵심 도메인 구조
 
-### 8.1 디자인 컨셉
+### 5.1 핵심 개념
 
-키워드:
+#### divination type
 
-- 신비로운
-- 고급스러운
-- 어두운 배경
-- 금색 포인트
-- 카드 애니메이션
-- 별, 달, 빛, 안개 효과
+앱에서 제공하는 하나의 점술 상품 단위이다.
 
-추천 색상:
+예시:
+
+- tarot
+- saju
+- rune
+- omikuji
+- zodiac
+
+#### input schema
+
+각 점술이 어떤 사용자 입력을 요구하는지 정의한다.
+
+예시:
+
+- 타로: 질문, spread_type
+- 사주: 이름, 생년월일, 출생시간, 달력 종류, 성별
+- 별자리: 생년월일
+
+#### resolver
+
+점술 결과 원천 데이터를 만드는 로직이다.
+
+예시:
+
+- 타로: 카드 3장 추출
+- 룬: 룬 1~3개 추출
+- 오미쿠지: 등급 추첨
+- 사주: 사주 원국 계산
+- 별자리: 태양궁 계산
+
+#### interpretation strategy
+
+무료 결과와 AI 결과를 어떤 방식으로 만드는지 정의한다.
+
+예시:
+
+- 타로: 카드 해석 조회
+- 사주: 사주 요소별 의미 조합
+- 별자리: 별자리 성향 + 운세 템플릿 조합
+
+### 5.2 추천 아키텍처 패턴
+
+각 점술은 아래 4계층으로 관리한다.
 
 ```text
-Background: #11101A
-Card: #1D1B2F
-Primary: #D6B56D
-Accent: #8E6CFF
-Text: #F5F1E8
-SubText: #A9A2B8
+Divination Catalog
+  -> Input Schema
+  -> Resolver
+  -> Interpretation Strategy
+  -> Result Presenter
 ```
 
+설명:
+
+- `Divination Catalog`: 홈/목록에서 보여줄 점술 메타데이터
+- `Input Schema`: 점술별 입력 필드 정의
+- `Resolver`: 원천 결과 계산 또는 추출
+- `Interpretation Strategy`: 무료/Plus 해석 생성 방식
+- `Result Presenter`: 결과 화면용 섹션 구성
+
+이 구조를 쓰면 신규 점술 추가 시 "새 점술 모듈 등록" 방식으로 확장할 수 있다.
+
 ---
 
-### 8.2 UX 원칙
+## 6. 점술별 처리 전략
 
-- 첫 화면에서 바로 점술을 시작할 수 있어야 한다.
-- 회원가입은 나중에 유도한다.
-- 무료 결과를 먼저 보여준 뒤 Plus 해석을 자연스럽게 제안한다.
-- AI 해석은 “더 깊은 해석 보기” 버튼으로 유도한다.
-- 결과 공유 이미지를 제공하면 바이럴에 유리하다.
+### 6.1 타로
+
+- 입력 방식: `draw_based`
+- 결과 생성: 카드/방향/스프레드 추출
+- 무료 해석: `interpretations` 조회
+- Plus 해석: 카드 배열 + 질문 + 기본 해석 기반 AI 생성
+
+### 6.2 룬
+
+- 입력 방식: `draw_based`
+- 결과 생성: 룬 추출
+- 무료 해석: 룬별 기본 의미 조회
+- Plus 해석: 조합 의미를 AI가 확장
+
+### 6.3 오미쿠지
+
+- 입력 방식: `draw_based`
+- 결과 생성: 운세 등급 추첨
+- 무료 해석: 등급 + 항목별 문구 조회
+- Plus 해석: 질문 맥락을 반영한 AI 확장
+
+### 6.4 사주
+
+- 입력 방식: `birth_data_based`
+- 결과 생성: 생년월일시 기반 원국 계산
+- 무료 해석: 오행, 일간, 십성, 대운/세운 일부 템플릿 조합
+- Plus 해석: 계산 결과 + 질문 + 사용자 맥락 기반 AI 설명
+
+사주는 카드형 점술과 다르므로 별도 포인트가 필요하다.
+
+1. 사용자 입력 검증이 중요하다.
+2. 양력/음력, 출생시간 미상 여부를 다뤄야 한다.
+3. 결과 원천은 랜덤 추출이 아니라 계산이다.
+4. 해석 데이터는 단일 item lookup보다 복수 규칙 조합이 더 많다.
+
+### 6.5 별자리
+
+- 입력 방식: `birth_data_based`
+- 결과 생성: 태양궁 또는 확장 시 출생 차트 계산
+- 무료 해석: 성향/오늘의 운세/카테고리별 템플릿
+- Plus 해석: 질문 기반 개인화 해석
 
 ---
 
-## 9. AI 프롬프트 설계
+## 7. DB 구조 개편안
 
-### 9.1 System Prompt 예시
+기존 `divination_items` 중심 구조는 유지하되, 계산형 점술을 수용하기 위해 메타/입력/결과 스키마를 분리한다.
+
+### 7.1 ERD 개요
 
 ```text
-당신은 전 세계 점술 지식에 기반하여 사용자에게 자기 성찰과 의사결정 참고용 해석을 제공하는 AI 점술 해석가입니다.
+users
+ └── readings
+      ├── reading_inputs
+      ├── reading_items
+      ├── reading_payloads
+      └── ai_results
 
-규칙:
-- 미래를 확정적으로 단정하지 마세요.
-- 의료, 법률, 투자 결정은 전문가 상담을 권장하세요.
-- 사용자를 불안하게 만들거나 공포를 조장하지 마세요.
-- 점술 결과는 오락과 자기 성찰 목적임을 자연스럽게 유지하세요.
-- 따뜻하고 차분한 어조로 답변하세요.
+divination_types
+ ├── divination_input_definitions
+ ├── divination_content_items
+ ├── divination_interpretations
+ └── divination_prompt_profiles
+
+subscriptions
+usage_limits
 ```
 
----
+### 7.2 핵심 테이블
 
-### 9.2 User Prompt Template 예시
+#### divination_types
 
-```text
-사용자 질문:
-{{question}}
+점술 카탈로그의 최상위 메타데이터이다.
 
-점술 유형:
-{{divination_type}}
-
-선택된 항목:
-{{selected_items}}
-
-기본 해석 데이터:
-{{base_interpretations}}
-
-분야:
-{{category}}
-
-위 정보를 바탕으로 다음 형식의 JSON으로 응답하세요.
-
-{
-  "summary": "짧은 요약",
-  "detailed_reading": "상세 해석",
-  "advice": "현실적인 조언",
-  "caution": "주의할 점"
-}
+```sql
+create table divination_types (
+    id uuid primary key default gen_random_uuid(),
+    code text unique not null,
+    name text not null,
+    short_description text,
+    description text,
+    icon_key text,
+    banner_image_url text,
+    input_mode text not null,
+    resolver_type text not null,
+    interpretation_mode text not null,
+    is_premium_only boolean default false,
+    is_active boolean default true,
+    sort_order int default 0,
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
 ```
-
----
-
-## 10. 보안 및 비용 관리
-
-### 10.1 보안 원칙
-
-- OpenAI API Key는 앱에 포함하지 않는다.
-- API Key는 Supabase Edge Function 환경 변수에 저장한다.
-- Plus 여부는 서버에서 검증한다.
-- 사용량 제한은 서버에서 처리한다.
-- RLS 정책으로 사용자별 데이터 접근을 제한한다.
-
----
-
-### 10.2 비용 관리
-
-무료 사용자는 AI 호출을 하지 않는다.
-
-Plus 사용자도 다음 제한을 둔다.
 
 예시:
 
 ```text
-Plus 월 구독:
-- AI 해석 1일 30회
-- 고급 통합 해석 1일 5회
+tarot    | input_mode=draw_based       | resolver_type=random_draw
+saju     | input_mode=birth_data_based | resolver_type=saju_chart
+rune     | input_mode=draw_based       | resolver_type=random_draw
+omikuji  | input_mode=draw_based       | resolver_type=random_draw
+zodiac   | input_mode=birth_data_based | resolver_type=zodiac_sign
 ```
 
-비용 추적 항목:
+#### divination_input_definitions
 
-- 사용자별 AI 호출 횟수
-- 토큰 사용량
-- 모델별 비용
-- 실패율
-- Plus 전환율
+점술별 입력 폼 구성을 관리한다.
 
----
+```sql
+create table divination_input_definitions (
+    id uuid primary key default gen_random_uuid(),
+    divination_type_id uuid references divination_types(id),
+    field_key text not null,
+    field_label text not null,
+    field_type text not null,
+    is_required boolean default true,
+    options_json jsonb,
+    placeholder text,
+    help_text text,
+    sort_order int default 0,
+    created_at timestamp default now()
+);
+```
 
-## 11. 앱스토어 심사 및 법적 주의사항
-
-점술 서비스는 다음 표현을 피해야 한다.
-
-피해야 할 표현:
+예시:
 
 ```text
-100% 정확한 미래 예측
-반드시 일어납니다
-투자 성공 보장
-질병 치료 가능
-운명을 바꿔드립니다
+saju.birth_date
+saju.birth_time
+saju.calendar_type
+saju.gender
+tarot.spread_type
 ```
 
-권장 표현:
+#### divination_content_items
+
+카드, 룬, 오미쿠지 결과 등 "콘텐츠 항목형" 점술에 사용한다.
+
+```sql
+create table divination_content_items (
+    id uuid primary key default gen_random_uuid(),
+    divination_type_id uuid references divination_types(id),
+    code text not null,
+    name text not null,
+    display_name text,
+    image_url text,
+    metadata_json jsonb,
+    order_no int default 0,
+    is_active boolean default true,
+    created_at timestamp default now()
+);
+```
+
+설명:
+
+- 타로 카드 정보 저장
+- 룬 문자 정보 저장
+- 오미쿠지 등급/항목 저장
+- 계산형 점술은 필수는 아니다
+
+#### divination_interpretations
+
+무료 해석과 기본 해석 문장을 저장한다.
+
+```sql
+create table divination_interpretations (
+    id uuid primary key default gen_random_uuid(),
+    divination_type_id uuid references divination_types(id),
+    item_id uuid null references divination_content_items(id),
+    interpretation_key text,
+    category text default 'general',
+    variant text default 'default',
+    summary text not null,
+    detail text,
+    advice text,
+    warning text,
+    language_code text default 'ko',
+    tags text[],
+    created_at timestamp default now(),
+    updated_at timestamp default now()
+);
+```
+
+활용 방식:
+
+- 타로: `item_id + category + variant(upright/reversed)`
+- 룬: `item_id + category`
+- 오미쿠지: `item_id + category`
+- 사주: `interpretation_key` 기반 규칙 문구
+  - 예: `day_master_gapwood`, `five_elements_fire_strong`
+- 별자리: `interpretation_key` 기반 문구
+  - 예: `zodiac_aries_general`
+
+#### readings
+
+점술 실행 단위이다.
+
+```sql
+create table readings (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references users(id),
+    divination_type_id uuid references divination_types(id),
+    question text,
+    category text default 'general',
+    result_mode text not null default 'free',
+    status text not null default 'completed',
+    summary text,
+    result_text text,
+    language_code text default 'ko',
+    created_at timestamp default now()
+);
+```
+
+#### reading_inputs
+
+점술 실행 시 사용자가 입력한 원본값을 저장한다.
+
+```sql
+create table reading_inputs (
+    id uuid primary key default gen_random_uuid(),
+    reading_id uuid references readings(id),
+    field_key text not null,
+    field_value text,
+    field_value_json jsonb,
+    created_at timestamp default now()
+);
+```
+
+예시:
+
+- 사주 출생일시
+- 성별
+- 양력/음력
+- 타로 spread_type
+
+#### reading_items
+
+추첨 또는 선택된 항목을 저장한다.
+
+```sql
+create table reading_items (
+    id uuid primary key default gen_random_uuid(),
+    reading_id uuid references readings(id),
+    item_id uuid references divination_content_items(id),
+    variant text default 'default',
+    position_name text,
+    position_order int default 0,
+    created_at timestamp default now()
+);
+```
+
+예시:
+
+- 타로 카드 3장
+- 룬 2개
+- 오미쿠지 등급
+
+#### reading_payloads
+
+계산형 점술의 구조화된 결과 원천 데이터를 저장한다.
+
+```sql
+create table reading_payloads (
+    id uuid primary key default gen_random_uuid(),
+    reading_id uuid references readings(id),
+    payload_type text not null,
+    payload_json jsonb not null,
+    created_at timestamp default now()
+);
+```
+
+예시:
+
+- 사주 원국 계산 결과
+- 오행 분포
+- 별자리 계산 결과
+
+#### ai_results
+
+Plus AI 해석 저장 테이블이다.
+
+```sql
+create table ai_results (
+    id uuid primary key default gen_random_uuid(),
+    reading_id uuid references readings(id),
+    model_name text,
+    prompt_profile_code text,
+    prompt_tokens int,
+    completion_tokens int,
+    total_tokens int,
+    result_json jsonb,
+    created_at timestamp default now()
+);
+```
+
+### 7.3 핵심 변경 포인트
+
+기존 대비 중요한 변경은 다음과 같다.
+
+1. `divination_items`를 `divination_content_items`로 일반화한다.
+2. `reading_inputs`를 추가해 사주 같은 입력형 점술을 저장한다.
+3. `reading_payloads`를 추가해 계산 결과를 구조화 저장한다.
+4. 무료/AI 결과를 모두 `readings` 중심으로 모으고, 세부 원천은 분리한다.
+
+---
+
+## 8. API / Edge Function 설계
+
+### 8.1 get-divination-catalog
+
+홈 화면과 점술 선택 화면에서 사용할 목록 API이다.
 
 ```text
-오락과 자기 성찰을 위한 서비스입니다.
-결과는 참고용이며 중요한 결정은 전문가와 상담하세요.
-미래를 확정적으로 보장하지 않습니다.
+GET /functions/v1/get-divination-catalog
 ```
 
-앱 내 고지 문구 예시:
+응답 예시:
+
+```json
+[
+  {
+    "code": "tarot",
+    "name": "타로",
+    "short_description": "카드로 현재 흐름과 조언을 살펴봅니다.",
+    "input_mode": "draw_based",
+    "is_premium_only": false
+  },
+  {
+    "code": "saju",
+    "name": "사주",
+    "short_description": "생년월일시를 바탕으로 기질과 흐름을 봅니다.",
+    "input_mode": "birth_data_based",
+    "is_premium_only": false
+  }
+]
+```
+
+### 8.2 get-divination-detail
+
+선택한 점술의 소개, 입력 필드, 무료/Plus 정책을 내려준다.
 
 ```text
-본 서비스의 점술 및 AI 해석 결과는 오락, 자기 성찰, 참고 목적으로 제공됩니다.
-의료, 법률, 투자, 심리상담 등 전문적인 판단이 필요한 문제는 반드시 전문가와 상담하시기 바랍니다.
+GET /functions/v1/get-divination-detail?code=saju
 ```
 
----
+### 8.3 create-free-reading
 
-## 12. MVP 개발 범위
-
-### 12.1 1차 MVP
-
-목표:
-
-> 타로 기반 무료 해석 + Plus AI 해석 구조 검증
-
-기능:
-
-- Flutter 앱 기본 UI
-- Supabase Auth 익명 로그인
-- 타로 카드 22장 또는 78장 등록
-- 무료 해석 DB 구축
-- 1장 뽑기
-- 3장 뽑기
-- 무료 결과 화면
-- Plus 구독 화면
-- AI 해석 Edge Function
-- 사용량 제한
-- 결과 기록 저장
-
----
-
-### 12.2 2차 버전
-
-추가 기능:
-
-- 룬 점술
-- 오미쿠지
-- 결과 공유 이미지
-- 푸시 알림
-- 다국어 지원
-- 관리자 페이지
-
----
-
-### 12.3 3차 버전
-
-추가 기능:
-
-- 여러 점술 통합 해석
-- 사주/주역 추가
-- 오늘의 운세
-- 커뮤니티 기능
-- 사용자 맞춤 추천
-
----
-
-## 13. 개발 순서
-
-### Phase 1. 기획 및 콘텐츠 구축
-
-1. 점술 유형 확정
-2. 타로 카드 데이터 정리
-3. 무료 해석 문장 작성
-4. Plus AI 해석 프롬프트 설계
-5. 앱 디자인 레퍼런스 수집
-
----
-
-### Phase 2. 백엔드 구축
-
-1. Supabase 프로젝트 생성
-2. DB 테이블 생성
-3. RLS 정책 설정
-4. Storage 버킷 생성
-5. Edge Function 기본 구조 생성
-6. OpenAI API 연동
-
----
-
-### Phase 3. 앱 개발
-
-1. Flutter 프로젝트 생성
-2. 앱 테마 적용
-3. 홈 화면 개발
-4. 점술 선택 화면 개발
-5. 타로 카드 뽑기 화면 개발
-6. 결과 화면 개발
-7. 구독 화면 개발
-8. 기록 화면 개발
-
----
-
-### Phase 4. 결제 및 구독
-
-1. RevenueCat 프로젝트 생성
-2. Google Play 상품 등록
-3. App Store 상품 등록
-4. Flutter RevenueCat SDK 연동
-5. Plus 여부 서버 검증
-
----
-
-### Phase 5. 테스트 및 출시
-
-1. Android 내부 테스트
-2. iOS TestFlight 테스트
-3. AI 비용 테스트
-4. 앱스토어 심사 문구 정리
-5. 개인정보처리방침 작성
-6. 서비스 이용약관 작성
-7. 1차 출시
-
----
-
-## 14. 폴더 구조 예시
+무료 점술 결과 생성 API이다.
 
 ```text
-divination_app/
-  app/
-    flutter_app/
-      lib/
-        main.dart
-        screens/
-        widgets/
-        services/
-        models/
-        themes/
-
-  backend/
-    supabase/
-      migrations/
-      functions/
-        create-free-reading/
-        create-ai-reading/
-        check-subscription/
-        get-reading-history/
-
-  docs/
-    architecture.md
-    db_schema.md
-    prompt_design.md
-    app_store_policy.md
-
-  assets/
-    tarot/
-    rune/
-    omikuji/
+POST /functions/v1/create-free-reading
 ```
+
+요청 예시:
+
+```json
+{
+  "user_id": "uuid",
+  "divination_code": "saju",
+  "question": "올해 이직운이 궁금해요.",
+  "category": "career",
+  "inputs": {
+    "birth_date": "1994-03-21",
+    "birth_time": "14:30",
+    "calendar_type": "solar",
+    "gender": "female"
+  }
+}
+```
+
+처리 순서:
+
+1. 사용자 사용량 확인
+2. 점술 타입 로딩
+3. 입력 검증
+4. resolver 실행
+5. 무료 해석 조합
+6. readings 및 하위 데이터 저장
+7. 결과 반환
+
+### 8.4 create-ai-reading
+
+Plus 사용자 전용 개인화 해석 API이다.
+
+```text
+POST /functions/v1/create-ai-reading
+```
+
+처리 순서:
+
+1. 서버에서 Plus 구독 상태 확인
+2. 무료 결과의 원천 데이터 재조회
+3. 점술 타입별 프롬프트 프로필 로딩
+4. AI 호출
+5. 결과 저장
+6. 응답 반환
+
+중요 원칙:
+
+- 앱에서 OpenAI API 직접 호출 금지
+- 서버에서만 Plus 여부 확인 후 AI 호출
+- 무료 사용자는 어떤 점술이든 AI 요청 불가
+
+### 8.5 get-reading-history
+
+기록 화면에서 점술 유형별 필터를 지원한다.
+
+```text
+GET /functions/v1/get-reading-history?user_id={user_id}&divination_code=tarot
+```
+
+---
+
+## 9. Flutter 앱 구조 개편안
+
+점술마다 화면 파일을 늘리는 방식 대신, 공통 흐름 + 타입별 컴포넌트 구조로 바꾸는 것이 좋다.
+
+### 9.1 추천 폴더 구조
+
+```text
+/lib
+  /app
+    app.dart
+    router.dart
+
+  /core
+    /theme
+    /network
+    /widgets
+    /utils
+
+  /features
+    /home
+    /catalog
+    /reading
+    /history
+    /subscription
+    /settings
+
+  /divinations
+    /shared
+      divination_definition.dart
+      divination_registry.dart
+      reading_input_schema.dart
+      reading_result_mapper.dart
+
+    /tarot
+      tarot_definition.dart
+      tarot_input_widget.dart
+      tarot_resolve_request.dart
+      tarot_result_sections.dart
+
+    /saju
+      saju_definition.dart
+      saju_input_widget.dart
+      saju_result_sections.dart
+
+    /rune
+      rune_definition.dart
+      rune_input_widget.dart
+      rune_result_sections.dart
+
+    /omikuji
+      omikuji_definition.dart
+      omikuji_input_widget.dart
+      omikuji_result_sections.dart
+
+    /zodiac
+      zodiac_definition.dart
+      zodiac_input_widget.dart
+      zodiac_result_sections.dart
+
+  /data
+    /models
+    /repositories
+    /services
+```
+
+### 9.2 핵심 구조 설명
+
+#### `features`
+
+앱의 공통 사용자 흐름을 관리한다.
+
+- 홈
+- 점술 선택
+- 공통 결과 화면
+- 기록
+- 구독
+
+#### `divinations`
+
+점술별 정의와 전용 UI를 관리한다.
+
+각 점술은 아래를 가진다.
+
+- 점술 메타 정의
+- 입력 위젯
+- 요청 매핑 로직
+- 결과 섹션 렌더링 로직
+
+#### `divination_registry`
+
+앱 시작 시 지원하는 점술 정의를 등록하는 레지스트리이다.
+
+예시 역할:
+
+- 코드로 점술 모듈 조회
+- 각 점술의 입력 화면 연결
+- 결과 화면 섹션 구성 연결
+
+### 9.3 화면 설계
+
+#### 1. HomeScreen
+
+역할:
+
+- 대표 배너
+- 오늘 추천 점술
+- 점술 카탈로그 진입
+- 최근 기록 바로가기
+
+추천 섹션:
+
+- 오늘의 메시지
+- 인기 점술
+- 새로 추가된 점술
+- Plus 전용 배너
+
+#### 2. DivinationCatalogScreen
+
+역할:
+
+- 사용 가능한 점술 목록 표시
+- 점술별 설명, 소요 시간, 무료/Plus 여부 표시
+- 카테고리 필터 제공
+
+카드 예시 정보:
+
+- 점술 이름
+- 한 줄 설명
+- 입력 방식
+- 추천 상황
+- 무료 가능 여부
+
+#### 3. DivinationIntroScreen
+
+역할:
+
+- 선택한 점술의 설명 제공
+- 필요한 입력값 안내
+- 주의사항 안내
+- 시작 버튼 제공
+
+사주 예시 안내:
+
+- 생년월일과 출생시간이 필요합니다.
+- 출생시간을 모르면 일부 정확도가 낮아질 수 있습니다.
+
+#### 4. QuestionInputScreen
+
+역할:
+
+- 공통 질문 입력
+- 카테고리 선택
+- 질문 없이 진행도 허용 가능
+
+#### 5. DivinationInputScreen
+
+공통 컨테이너 화면이며, 내부는 점술별 위젯으로 교체한다.
+
+예시:
+
+- 타로: spread 선택 + 카드 뽑기
+- 사주: 생년월일/시간/성별 입력 폼
+- 오미쿠지: 바로 뽑기 애니메이션
+
+#### 6. FreeResultScreen
+
+공통 결과 화면이다.
+
+공통 섹션:
+
+- 요약
+- 핵심 해석
+- 조언
+- 주의할 점
+- 선택/계산 원천 결과
+
+점술별 확장 섹션:
+
+- 타로: 뽑은 카드 리스트
+- 사주: 오행 분포, 일간 설명
+- 별자리: 별자리 성향 카드
+
+#### 7. PlusUpsellSheet / SubscriptionScreen
+
+역할:
+
+- "더 깊은 AI 해석 보기" 유도
+- Plus 혜택 설명
+- AI 해석 예시 미리보기 제공
+
+#### 8. AiResultScreen
+
+역할:
+
+- 무료 결과보다 더 긴 개인화 해석 제공
+- 질문 맥락 반영
+- 실행 가능한 조언 제시
+
+#### 9. HistoryScreen
+
+역할:
+
+- 전체 기록 보기
+- 점술 유형별 필터
+- 무료/AI 결과 구분
+
+---
+
+## 10. 공통 결과 모델 설계
+
+UI와 API를 단순화하기 위해 점술별 결과를 공통 구조로 매핑한다.
+
+### 10.1 공통 응답 모델 예시
+
+```json
+{
+  "reading_id": "uuid",
+  "divination_code": "saju",
+  "result_mode": "free",
+  "summary": "올해는 기반을 다지는 흐름이 강합니다.",
+  "sections": [
+    {
+      "type": "core_interpretation",
+      "title": "핵심 해석",
+      "body": "지금은 크게 확장하기보다..."
+    },
+    {
+      "type": "advice",
+      "title": "조언",
+      "body": "이직을 서두르기보다 준비를 먼저..."
+    }
+  ],
+  "source_items": [],
+  "source_payload": {
+    "day_master": "갑목",
+    "five_elements": {
+      "wood": 3,
+      "fire": 1,
+      "earth": 2,
+      "metal": 0,
+      "water": 2
+    }
+  }
+}
+```
+
+장점:
+
+1. 결과 화면을 공통화할 수 있다.
+2. 신규 점술 추가 시 프론트 변경 범위를 줄일 수 있다.
+3. AI 결과도 동일 구조로 확장 가능하다.
+
+---
+
+## 11. 프롬프트 설계 방향
+
+AI 프롬프트는 점술 공통 베이스 + 점술별 프로필로 나누는 것이 좋다.
+
+### 11.1 공통 시스템 프롬프트
+
+역할:
+
+- 안전성
+- 비확정적 표현
+- 자기성찰 중심 표현
+- 법률/의료/투자 고위험 문구 제한
+
+### 11.2 점술별 프롬프트 프로필
+
+예시:
+
+- `tarot_ko_v1`
+- `saju_ko_v1`
+- `rune_ko_v1`
+- `zodiac_ko_v1`
+
+사주 프롬프트에는 추가로 아래 요소가 필요하다.
+
+- 사주 계산 결과 설명 방식
+- 지나치게 단정적 운명론 금지
+- 출생시간 불명 시 불확실성 명시
+
+---
+
+## 12. 무료/Plus 분리 원칙
+
+모든 점술에서 아래 규칙을 고정한다.
+
+### 무료
+
+- DB 또는 규칙 기반 고정 해석만 제공
+- OpenAI API 호출 없음
+- 응답 속도와 비용 안정성 우선
+
+### Plus
+
+- 무료 결과를 바탕으로 AI 개인화 해석 제공
+- 질문 맥락 반영
+- 더 긴 설명과 상황별 조언 제공
+
+중요:
+
+- Plus 해석은 무료 해석을 대체하는 것이 아니라 확장하는 방식이 좋다.
+- 무료 결과를 먼저 보여주고, 이후 Plus 해석으로 자연스럽게 전환한다.
+
+---
+
+## 13. 단계별 개발 권장 순서
+
+### Phase 1. 구조 개편
+
+1. 점술 카탈로그 개념 도입
+2. `divination_types` 확장
+3. `reading_inputs`, `reading_payloads` 추가
+4. Flutter `features` / `divinations` 구조로 정리
+
+### Phase 2. 공통 화면 구축
+
+1. HomeScreen 개편
+2. DivinationCatalogScreen 추가
+3. DivinationIntroScreen 추가
+4. 공통 ResultScreen 리팩터링
+
+### Phase 3. 기존 타로 이관
+
+1. 타로를 새 registry 구조로 옮김
+2. 기존 타로 결과를 공통 결과 모델로 매핑
+3. 무료/AI 흐름 유지 검증
+
+### Phase 4. 사주 추가
+
+1. 사주 입력 폼 추가
+2. 사주 계산 로직 연결
+3. 사주 무료 해석 규칙 설계
+4. 사주 Plus 프롬프트 추가
+
+### Phase 5. 룬/오미쿠지/별자리 추가
+
+1. draw_based 점술 재사용 구조 검증
+2. birth_data_based 점술 재사용 구조 검증
+3. 카탈로그와 기록 화면 필터 완성
+
+---
+
+## 14. 마이그레이션 권장 사항
+
+DB 변경 시 migration 파일 생성 원칙에 맞춰 아래 순서로 진행하는 것이 좋다.
+
+1. `divination_types` 확장 migration
+2. `divination_input_definitions` 생성 migration
+3. `divination_content_items` 생성 또는 기존 `divination_items` rename migration
+4. `divination_interpretations` 생성 또는 기존 `interpretations` 확장 migration
+5. `reading_inputs` 생성 migration
+6. `reading_payloads` 생성 migration
+7. 기존 타로 데이터 이관 migration
+
+주의:
+
+- 기존 운영 데이터가 있다면 rename + backfill 전략이 안전하다.
+- 신규 개발 초기라면 재정의 후 seed 재구축이 더 단순할 수 있다.
 
 ---
 
 ## 15. 최종 추천 방향
 
-가장 현실적인 구현 방향은 다음과 같다.
+추천 방향은 다음 한 줄로 정리할 수 있다.
+
+> "점술별 화면을 계속 추가하는 구조"가 아니라 "점술 카탈로그 + 점술 모듈 등록 구조"로 전환한다.
+
+특히 사주 추가를 고려하면 앞으로의 기준은 타로가 아니라 아래 세 가지여야 한다.
+
+1. 점술별 입력 방식이 달라도 수용 가능한가
+2. 무료/Plus 해석 분리가 유지되는가
+3. 신규 점술 추가 시 공통 화면과 공통 데이터 모델을 재사용할 수 있는가
+
+이 기준으로 보면 가장 적합한 구조는 다음과 같다.
 
 ```text
-Flutter 앱
-+ Supabase PostgreSQL
-+ Supabase Edge Functions
-+ 지식창고 기반 무료 해석
-+ OpenAI API 기반 Plus 해석
-+ RevenueCat 구독 결제
+Flutter App
++ Divination Catalog
++ Divination Registry
++ Common Reading Flow
++ Type-specific Input UI
+
+Supabase
++ Divination Metadata
++ Free Interpretation Data
++ Reading Inputs / Items / Payloads
++ Edge Functions
+
+OpenAI API
++ Plus User Only
++ Type-specific Prompt Profiles
 ```
 
-이 구조는 다음 장점이 있다.
-
-1. 혼자서도 빠르게 개발 가능하다.
-2. 서버 개발 부담이 적다.
-3. 디자인 품질을 높이기 쉽다.
-4. 무료 사용자의 AI 비용을 최소화할 수 있다.
-5. Plus 전환 구조가 명확하다.
-6. 이후 다양한 점술 콘텐츠로 확장하기 쉽다.
-
-초기에는 너무 많은 점술을 넣지 말고, 타로를 완성도 있게 구현한 뒤 룬과 오미쿠지를 추가하는 방식이 좋다.
-
+이 구조로 가면 타로 이후 사주, 룬, 오미쿠지, 별자리를 추가할 때도 큰 재설계 없이 확장할 수 있다.

@@ -5,7 +5,9 @@
 MVP DB는 무료 해석과 Plus AI 해석을 분리한다.
 
 - `profiles`, `subscriptions`, `daily_usage`: 사용자, 구독 상태, 일일 사용량 제한
-- `divination_types`, `divination_items`, `interpretations`: 무료 지식창고와 AI 프롬프트 기반 데이터
+- `divination_types`, `divination_items`, `interpretations`: 기존 타로 중심 무료 지식창고
+- `divination_input_definitions`, `reading_inputs`, `reading_payloads`: 다중 점술 입력/계산 결과 저장
+- `divination_interpretations`: 점술 공통 무료 해석 계층
 - `spreads`, `spread_positions`: 타로 리딩 방식과 카드 위치 의미
 - `readings`, `reading_items`: 사용자 점술 실행 기록
 - `ai_results`, `prompt_templates`: Plus AI 해석 결과와 프롬프트 버전 관리
@@ -63,6 +65,14 @@ RevenueCat 구독 상태 캐시다.
 
 타로, 룬, 오미쿠지 같은 점술 유형이다.
 
+다중 점술 확장 이후에는 아래 메타데이터를 추가로 가진다.
+
+- `short_description`
+- `icon_key`
+- `input_mode`: `draw_based`, `birth_data_based`, `hybrid`
+- `resolver_type`: `random_draw`, `saju_chart`, `zodiac_sign`, `rule_engine`
+- `interpretation_mode`: `prewritten_lookup`, `rule_based`, `lookup_plus_ai`, `rule_plus_ai`
+
 ### divination_items
 
 카드, 룬, 오미쿠지 결과 같은 점술 항목이다.
@@ -91,6 +101,50 @@ Flutter 앱은 위 값을 `assets/tarot/rws_major/fool.jpg`, `assets/tarot/rws_m
 - `category`: `general`, `love`, `career`, `money`, `health`, `relationship`
 - `summary`, `detail`, `advice`, `warning`
 - `language_code`
+
+현재는 타로 중심 테이블로 유지한다. 다중 점술 일반화는 `divination_interpretations`를 통해 확장한다.
+
+### divination_input_definitions
+
+점술별 입력 필드 정의 테이블이다.
+
+예:
+
+- 타로: `spread_code`
+- 사주: `birth_date`, `birth_time`, `calendar_type`, `gender`
+- 별자리: `birth_date`
+
+### divination_interpretations
+
+점술 공통 무료 해석 테이블이다.
+
+지원 방식:
+
+- `item_id` 기반 해석
+  - 타로, 룬, 오미쿠지
+- `interpretation_key` 기반 해석
+  - 사주, 별자리, 향후 규칙형 점술
+
+### reading_inputs
+
+사용자가 실제로 입력한 점술 원본값을 저장한다.
+
+예:
+
+- 사주 출생일
+- 출생시간
+- 양력/음력
+- 타로 spread_code
+
+### reading_payloads
+
+계산형 점술 결과 원천 JSON을 저장한다.
+
+예:
+
+- 사주 원국 계산 결과
+- 오행 분포
+- 별자리 계산 결과
 
 ### spreads
 

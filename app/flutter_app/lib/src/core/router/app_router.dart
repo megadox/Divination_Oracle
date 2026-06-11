@@ -1,5 +1,8 @@
 import 'package:go_router/go_router.dart';
 
+import '../../features/divination/presentation/divination_catalog_screen.dart';
+import '../../features/divination/presentation/divination_intro_screen.dart';
+import '../../features/divination/presentation/divination_reading_screen.dart';
 import '../../features/divination/presentation/home_screen.dart';
 import '../../features/divination/presentation/reading_result_screen.dart';
 import '../../features/history/presentation/history_screen.dart';
@@ -11,6 +14,26 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/',
       builder: (context, state) => const HomeScreen(),
+    ),
+    GoRoute(
+      path: '/catalog',
+      builder: (context, state) => const DivinationCatalogScreen(),
+    ),
+    GoRoute(
+      path: '/catalog/:code',
+      builder: (context, state) {
+        return DivinationIntroScreen(
+          code: state.pathParameters['code']!,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/reading/:code',
+      builder: (context, state) {
+        return DivinationReadingScreen(
+          divinationCode: state.pathParameters['code']!,
+        );
+      },
     ),
     GoRoute(
       path: '/result/:readingId',

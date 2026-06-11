@@ -19,6 +19,16 @@ class DivinationRepository {
     return rows.map(DivinationType.fromJson).toList();
   }
 
+  Future<DivinationType> fetchTypeByCode(String code) async {
+    final row = await _client
+        .from('divination_types')
+        .select()
+        .eq('code', code)
+        .eq('is_active', true)
+        .single();
+    return DivinationType.fromJson(row);
+  }
+
   Future<List<TarotSpread>> fetchTarotSpreads() async {
     final tarotType = await _client
         .from('divination_types')
@@ -54,6 +64,7 @@ class DivinationRepository {
     required String category,
     required String question,
     String spreadCode = 'single_question',
+    Map<String, dynamic>? inputs,
   }) async {
     final response = await _client.functions.invoke(
       'create-free-reading',
@@ -63,6 +74,7 @@ class DivinationRepository {
         'question': question,
         'spread_code': spreadCode,
         'language_code': 'ko',
+        if (inputs != null) 'inputs': inputs,
       },
     );
     return Reading.fromJson(response.data as Map<String, dynamic>);
@@ -73,6 +85,7 @@ class DivinationRepository {
     required String category,
     required String question,
     String spreadCode = 'single_question',
+    Map<String, dynamic>? inputs,
   }) async {
     final response = await _client.functions.invoke(
       'create-ai-reading',
@@ -82,6 +95,7 @@ class DivinationRepository {
         'question': question,
         'spread_code': spreadCode,
         'language_code': 'ko',
+        if (inputs != null) 'inputs': inputs,
       },
     );
     return Reading.fromJson(response.data as Map<String, dynamic>);
