@@ -410,3 +410,37 @@ project/
   3. 사주 원국 계산 고도화
   4. 룬/오미쿠지/별자리 결과 문구 고도화
   5. Plus 성공 호출 검증과 AI 응답 품질 점검
+
+## 2026-06-13
+
+- 비타로 점술 이미지 표시 1차 확장
+  - `saju`, `omikuji`, `rune`, `zodiac` 대표 이미지를 Flutter asset으로 추가
+  - asset 경로: `app/flutter_app/assets/divinations/`
+  - `pubspec.yaml`에 `assets/divinations/` 등록
+- 결과 화면 이미지 노출 구조 확장
+  - `reading_result_screen.dart`에서 타로 외 점술도 결과 상단에 전용 이미지를 표시하도록 반영
+  - 타로는 기존 카드 이미지 표시 흐름 유지
+- Android 테스트 APK 생성
+  - `flutter build apk --release`
+  - 산출물: `app/flutter_app/build/app/outputs/flutter-apk/app-release.apk`
+- 로컬 Android 빌드 환경 이슈 대응
+  - 손상된 NDK 폴더(`C:\Users\megad\AppData\Local\Android\Sdk\ndk\28.2.13676358`) 제거 후 Gradle 재다운로드로 복구
+- 검증
+  - `flutter analyze` 통과
+  - `flutter test` 통과
+
+## 2026-06-13 추가 진행
+
+- 비타로 점술 결과 이미지 개인화 2차 확장
+  - 대표 이미지 1장 고정 표시에서 payload 기반 hero overlay 방식으로 확장
+  - `saju`: dominant element, zodiac animal, season, yin/yang 반영
+  - `zodiac`: resolved sign, element, modality 반영
+  - `rune`: selected rune set 중심 요약 반영
+  - `omikuji`: fortune grade, focus 반영
+- 설계 메모 추가
+  - `docs/divination_result_image_plan.md`
+- Android 테스트 APK 재생성
+  - 산출물 갱신: `app/flutter_app/build/app/outputs/flutter-apk/app-release.apk`
+- 검증
+  - `flutter analyze` 통과
+  - `flutter test` 통과
