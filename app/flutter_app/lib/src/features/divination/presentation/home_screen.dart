@@ -22,6 +22,11 @@ class HomeScreen extends ConsumerWidget {
             icon: const Icon(Icons.history),
           ),
           IconButton(
+            tooltip: 'Settings',
+            onPressed: () => context.push('/settings'),
+            icon: const Icon(Icons.settings_outlined),
+          ),
+          IconButton(
             tooltip: 'Plus',
             onPressed: () => context.push('/plus'),
             icon: const Icon(Icons.auto_awesome),
@@ -34,18 +39,18 @@ class HomeScreen extends ConsumerWidget {
           children: [
             _HeroPanel(
               onBrowseCatalog: () => context.push('/catalog'),
-              onStartTarot: () => context.push('/reading/tarot'),
+              onStartTarot: () => context.push('/reading/tarot/question'),
             ),
             const SizedBox(height: 24),
             Text(
-              '추천 점술',
+              'Featured Divinations',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
             types.when(
               data: (items) => _FeaturedDivinations(types: items.take(3).toList()),
               error: (error, stackTrace) => _InfoCard(
-                title: '점술 목록을 불러오지 못했습니다.',
+                title: 'Failed to load divinations',
                 body: '$error',
               ),
               loading: () => const Padding(
@@ -55,8 +60,15 @@ class HomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             const _InfoCard(
-              title: '이용 흐름',
-              body: '점술을 선택하고 질문을 입력한 뒤, 무료 해석을 먼저 보고 Plus에서 AI 개인화 해석을 확장할 수 있습니다.',
+              title: 'Reading Flow',
+              body:
+                  'Choose a divination, enter your question, review the free reading first, and expand to Plus AI when you want a deeper personalized interpretation.',
+            ),
+            const SizedBox(height: 16),
+            const _InfoCard(
+              title: 'Settings',
+              body:
+                  'Open Settings to review version, build mode, and runtime configuration before testing.',
             ),
           ],
         ),
@@ -97,12 +109,12 @@ class _HeroPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '오늘은 어떤 점술로 흐름을 볼까요?',
+              'What kind of reading do you want today?',
               style: theme.textTheme.headlineSmall,
             ),
             const SizedBox(height: 12),
             Text(
-              '타로에서 시작하고, 앞으로 사주·룬·오미쿠지·별자리까지 같은 흐름으로 선택해 진행할 수 있도록 구조를 넓히고 있습니다.',
+              'Tarot, Saju, Rune, Omikuji, and Zodiac now follow the same reading flow so each type can expand cleanly from the same app structure.',
               style: theme.textTheme.bodyLarge,
             ),
             const SizedBox(height: 20),
@@ -113,12 +125,12 @@ class _HeroPanel extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: onBrowseCatalog,
                   icon: const Icon(Icons.explore),
-                  label: const Text('점술 선택하기'),
+                  label: const Text('Browse Divinations'),
                 ),
                 OutlinedButton.icon(
                   onPressed: onStartTarot,
                   icon: const Icon(Icons.style),
-                  label: const Text('바로 타로 보기'),
+                  label: const Text('Start Tarot'),
                 ),
               ],
             ),
@@ -138,8 +150,8 @@ class _FeaturedDivinations extends StatelessWidget {
   Widget build(BuildContext context) {
     if (types.isEmpty) {
       return const _InfoCard(
-        title: '준비된 점술이 없습니다.',
-        body: '활성화된 점술이 등록되면 여기서 바로 선택할 수 있습니다.',
+        title: 'No divinations available',
+        body: 'Active divinations will appear here once they are configured.',
       );
     }
 
@@ -177,7 +189,10 @@ class _DivinationPreviewCard extends StatelessWidget {
             CircleAvatar(
               radius: 24,
               backgroundColor: theme.colorScheme.secondaryContainer,
-              child: Icon(_typeIcon(type), color: theme.colorScheme.onSecondaryContainer),
+              child: Icon(
+                _typeIcon(type),
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -187,7 +202,9 @@ class _DivinationPreviewCard extends StatelessWidget {
                   Text(type.displayName, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 4),
                   Text(
-                    type.shortDescription ?? type.description ?? '설명이 준비 중입니다.',
+                    type.shortDescription ??
+                        type.description ??
+                        'Description is being prepared.',
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 8),
@@ -196,7 +213,7 @@ class _DivinationPreviewCard extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       _Pill(label: _inputModeLabel(type.inputMode)),
-                      if (type.isPlusOnly) const _Pill(label: 'Plus 전용'),
+                      if (type.isPlusOnly) const _Pill(label: 'Plus only'),
                     ],
                   ),
                 ],
@@ -282,9 +299,9 @@ IconData _typeIcon(DivinationType type) {
 
 String _inputModeLabel(String inputMode) {
   return switch (inputMode) {
-    'draw_based' => '추첨형',
-    'birth_data_based' => '생년월일형',
-    'hybrid' => '복합형',
-    _ => '기타',
+    'draw_based' => 'draw-based',
+    'birth_data_based' => 'birth-data',
+    'hybrid' => 'hybrid',
+    _ => 'other',
   };
 }

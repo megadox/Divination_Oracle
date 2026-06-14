@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/supabase/supabase_providers.dart';
+import '../../../divinations/shared/divination_definition.dart';
+import '../../../divinations/shared/reading_result_mapper.dart';
+import '../../../divinations/shared/reading_result_section.dart';
 import '../domain/reading.dart';
+import '../domain/reading_detail.dart';
 
 final readingDetailProvider =
     FutureProvider.family<ReadingDetail, String>((ref, id) async {
@@ -34,68 +38,6 @@ final readingDetailProvider =
   );
 });
 
-class ReadingDetail {
-  const ReadingDetail({
-    required this.reading,
-    required this.items,
-    required this.divinationCode,
-    required this.divinationDisplayName,
-    required this.payloads,
-  });
-
-  final Reading reading;
-  final List<ReadingCard> items;
-  final String divinationCode;
-  final String divinationDisplayName;
-  final List<ReadingPayload> payloads;
-}
-
-class ReadingPayload {
-  const ReadingPayload({
-    required this.payloadType,
-    required this.payloadJson,
-  });
-
-  final String payloadType;
-  final Map<String, dynamic> payloadJson;
-
-  factory ReadingPayload.fromJson(Map<String, dynamic> json) {
-    return ReadingPayload(
-      payloadType: (json['payload_type'] ?? 'unknown') as String,
-      payloadJson: json['payload_json'] is Map<String, dynamic>
-          ? json['payload_json'] as Map<String, dynamic>
-          : <String, dynamic>{},
-    );
-  }
-}
-
-class ReadingCard {
-  const ReadingCard({
-    required this.positionName,
-    required this.orientation,
-    required this.cardName,
-    required this.cardCode,
-    this.imageUrl,
-  });
-
-  final String positionName;
-  final String orientation;
-  final String cardName;
-  final String cardCode;
-  final String? imageUrl;
-
-  factory ReadingCard.fromJson(Map<String, dynamic> json) {
-    final item = json['divination_items'] as Map<String, dynamic>?;
-    return ReadingCard(
-      positionName: (json['position_name'] ?? '카드') as String,
-      orientation: (json['orientation'] ?? 'none') as String,
-      cardName: (item?['display_name'] ?? item?['name'] ?? 'Unknown') as String,
-      cardCode: (item?['code'] ?? 'unknown') as String,
-      imageUrl: item?['image_url'] as String?,
-    );
-  }
-}
-
 class ReadingResultScreen extends ConsumerWidget {
   const ReadingResultScreen({required this.readingId, super.key});
 
@@ -106,64 +48,81 @@ class ReadingResultScreen extends ConsumerWidget {
     final detail = ref.watch(readingDetailProvider(readingId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('해석 결과')),
+      appBar: AppBar(title: const Text('Reading Result')),
       body: SafeArea(
         child: detail.when(
-          data: (value) => ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              Text(
-                value.reading.resultType == 'plus_ai' ? 'Plus AI 해석' : '무료 해석',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '점술: ${value.divinationDisplayName}',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              if (value.reading.question?.isNotEmpty == true) ...[
-                Text('질문: ${value.reading.question}'),
-                const SizedBox(height: 8),
-              ],
-              Text('스프레드: ${value.reading.spreadCode}'),
-              Text('분야: ${value.reading.category}'),
-              const SizedBox(height: 16),
-              if (value.divinationCode != 'tarot') ...[
-                const SizedBox(height: 20),
-                _DivinationHeroImage(detail: value),
-                const SizedBox(height: 16),
-              ],
-              if (value.divinationCode == 'saju') ...[
-                _SajuResultSections(detail: value),
-                const SizedBox(height: 20),
-              ] else if (value.divinationCode == 'zodiac') ...[
-                _ZodiacResultSections(detail: value),
-                const SizedBox(height: 20),
-              ] else if (value.divinationCode == 'rune') ...[
-                _RuneResultSections(detail: value),
-                const SizedBox(height: 20),
-              ] else if (value.divinationCode == 'omikuji') ...[
-                _OmikujiResultSections(detail: value),
-                const SizedBox(height: 20),
-              ],
-              if (value.items.isNotEmpty) ...[
+          data: (value) {
+            final model = mapReadingResult(value);
+            return ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
                 Text(
-                  '뽑은 카드',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  model.displayModeLabel,
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 12),
-                _ReadingCardGrid(items: value.items),
-                const SizedBox(height: 16),
+                Text(
+                  'Divination: ${value.divinationDisplayName}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                if (value.reading.question?.isNotEmpty == true) ...[
+                  Text('Question: ${value.reading.question}'),
+                  const SizedBox(height: 8),
+                ],
+                Text('Spread: ${value.reading.spreadCode}'),
+                Text('Category: ${value.reading.category}'),
+                if (model.hero != null) ...[
+                  const SizedBox(height: 20),
+                  _DivinationHero(hero: model.hero!),
+                ],
+                if (model.sections.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  for (final section in model.sections) ...[
+                    _ResultSectionCard(section: section),
+                    const SizedBox(height: 16),
+                  ],
+                ],
+                if (value.items.isNotEmpty) ...[
+                  Text(
+                    'Source Items',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  _ReadingCardGrid(items: value.items),
+                  const SizedBox(height: 20),
+                ],
+                if (model.summary != null)
+                  _ResultTextCard(title: 'Summary', body: model.summary!),
+                if (model.summary != null) const SizedBox(height: 16),
+                if (model.detailedReading != null)
+                  _ResultTextCard(
+                    title: 'Interpretation',
+                    body: model.detailedReading!,
+                  ),
+                if (model.detailedReading != null) const SizedBox(height: 16),
+                if (model.advice != null)
+                  _ResultTextCard(title: 'Advice', body: model.advice!),
+                if (model.advice != null) const SizedBox(height: 16),
+                if (model.caution != null)
+                  _ResultTextCard(title: 'Caution', body: model.caution!),
+                if (model.caution != null) const SizedBox(height: 16),
+                if (model.fallbackText != null)
+                  _ResultTextCard(title: 'Full Reading', body: model.fallbackText!),
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: () => context.go('/'),
+                  icon: const Icon(Icons.home_outlined),
+                  label: const Text('Go Home'),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonal(
+                  onPressed: () => context.pop(),
+                  child: const Text('Back'),
+                ),
               ],
-              Text(value.reading.resultText ?? '저장된 해석이 없습니다.'),
-              const SizedBox(height: 24),
-              FilledButton.tonal(
-                onPressed: () => context.pop(),
-                child: const Text('새 해석하기'),
-              ),
-            ],
-          ),
+            );
+          },
           error: (error, stackTrace) => Center(child: Text('$error')),
           loading: () => const Center(child: CircularProgressIndicator()),
         ),
@@ -172,237 +131,200 @@ class ReadingResultScreen extends ConsumerWidget {
   }
 }
 
-class _SajuResultSections extends StatelessWidget {
-  const _SajuResultSections({required this.detail});
+class _DivinationHero extends StatelessWidget {
+  const _DivinationHero({required this.hero});
 
-  final ReadingDetail detail;
+  final DivinationHeroData hero;
 
   @override
   Widget build(BuildContext context) {
-    final sajuPayload = _findSajuPayload(detail.payloads);
-    final sourcePayload = detail.reading.resultJson?['source_payload'];
-    final payload = sajuPayload ??
-        (sourcePayload is Map<String, dynamic>
-            ? sourcePayload
-            : <String, dynamic>{});
-
-    if (payload.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final zodiacAnimal = payload['zodiac_animal'] as String?;
-    final dominantElement = payload['dominant_element'] as String?;
-    final heavenlyElement = payload['heavenly_element'] as String?;
-    final season = payload['season'] as String?;
-    final yinYang = payload['yin_yang'] as String?;
-    final hasBirthTime = payload['has_birth_time'] as bool?;
-    final elementCounts = payload['element_counts'] is Map<String, dynamic>
-        ? payload['element_counts'] as Map<String, dynamic>
-        : <String, dynamic>{};
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '사주 핵심 보기',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: AspectRatio(
+        aspectRatio: 3 / 4,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            if (zodiacAnimal != null)
-              _SajuBadge(label: '띠', value: '$zodiacAnimal띠'),
-            if (dominantElement != null)
-              _SajuBadge(label: '우세 오행', value: _elementLabel(dominantElement)),
-            if (heavenlyElement != null)
-              _SajuBadge(label: '기본 기운', value: _elementLabel(heavenlyElement)),
-            if (season != null)
-              _SajuBadge(label: '계절 흐름', value: _seasonLabel(season)),
-            if (yinYang != null)
-              _SajuBadge(label: '음양', value: yinYang == 'yang' ? '양' : '음'),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _ResultInfoCard(
-          title: '사주 입력 기준',
-          body: hasBirthTime == true
-              ? '출생시간까지 포함해 현재 초안 해석을 생성했습니다.'
-              : '출생시간 없이 단순화된 기준으로 현재 초안 해석을 생성했습니다.',
-        ),
-        if (elementCounts.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(
-            '오행 분포',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 12),
-          _FiveElementsSection(elementCounts: elementCounts),
-        ],
-      ],
-    );
-  }
-}
-
-class _ZodiacResultSections extends StatelessWidget {
-  const _ZodiacResultSections({required this.detail});
-
-  final ReadingDetail detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final payload = _findPayload(detail, 'zodiac_profile');
-    if (payload.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final sign = payload['display_name'] as String?;
-    final element = payload['element'] as String?;
-    final modality = payload['modality'] as String?;
-    final trait = payload['trait'] as String?;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '별자리 핵심 보기',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            if (sign != null) _SajuBadge(label: '별자리', value: sign),
-            if (element != null) _SajuBadge(label: '원소', value: _zodiacElementLabel(element)),
-            if (modality != null) _SajuBadge(label: '성향', value: _modalityLabel(modality)),
-          ],
-        ),
-        if (trait != null) ...[
-          const SizedBox(height: 16),
-          _ResultInfoCard(title: '성향 포인트', body: trait),
-        ],
-      ],
-    );
-  }
-}
-
-class _RuneResultSections extends StatelessWidget {
-  const _RuneResultSections({required this.detail});
-
-  final ReadingDetail detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final payload = _findPayload(detail, 'rune_cast');
-    if (payload.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final selectedRunes = payload['selected_runes'] is List
-        ? payload['selected_runes'] as List<dynamic>
-        : const [];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '룬 핵심 보기',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 12),
-        for (final rune in selectedRunes) ...[
-          if (rune is Map<String, dynamic>)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${rune['role'] ?? '메시지'} · ${rune['name'] ?? 'Rune'}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 6),
-                    Text('${rune['keyword'] ?? ''}'),
-                    const SizedBox(height: 6),
-                    Text('${rune['meaning'] ?? ''}'),
+            Image.asset(
+              hero.assetPath,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                );
+              },
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.08),
+                    Colors.black.withValues(alpha: 0.18),
+                    Colors.black.withValues(alpha: 0.76),
                   ],
+                  stops: const [0.0, 0.52, 1.0],
                 ),
               ),
             ),
-        ],
-      ],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HeroPill(label: 'Featured', color: hero.accentColor),
+                  const Spacer(),
+                  Text(
+                    hero.title,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  if (hero.subtitle != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      hero.subtitle!,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.92),
+                          ),
+                    ),
+                  ],
+                  if (hero.tags.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final tag in hero.tags)
+                          _HeroPill(
+                            label: tag,
+                            color: hero.accentColor.withValues(alpha: 0.92),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _OmikujiResultSections extends StatelessWidget {
-  const _OmikujiResultSections({required this.detail});
+class _HeroPill extends StatelessWidget {
+  const _HeroPill({
+    required this.label,
+    required this.color,
+  });
 
-  final ReadingDetail detail;
+  final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final payload = _findPayload(detail, 'omikuji_draw');
-    if (payload.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final fortune = payload['fortune_label'] as String?;
-    final focus = payload['focus'] as String?;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '오미쿠지 핵심 보기',
-          style: Theme.of(context).textTheme.titleLarge,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            if (fortune != null) _SajuBadge(label: '운세', value: fortune),
-            if (focus != null) _SajuBadge(label: '집중 영역', value: focus),
-          ],
-        ),
-        const SizedBox(height: 16),
-        const _ResultInfoCard(
-          title: '읽는 법',
-          body: '오미쿠지는 지금의 길흉 분위기를 가볍게 읽는 참고 도구입니다. 좋은 결과든 조심 신호든 오늘의 태도를 다듬는 힌트로 활용해 보세요.',
-        ),
-      ],
+      ),
     );
   }
 }
 
-Map<String, dynamic>? _findSajuPayload(List<ReadingPayload> payloads) {
-  for (final payload in payloads) {
-    if (payload.payloadType == 'saju_chart') {
-      return payload.payloadJson;
-    }
+class _ResultSectionCard extends StatelessWidget {
+  const _ResultSectionCard({required this.section});
+
+  final ReadingResultSection section;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(section.title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            switch (section.type) {
+              ReadingResultSectionType.text => Text(section.body ?? ''),
+              ReadingResultSectionType.badges => Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final badge in section.badges)
+                      _ResultBadge(label: badge.label, value: badge.value),
+                  ],
+                ),
+              ReadingResultSectionType.metrics => Column(
+                  children: [
+                    for (final metric in section.metrics) ...[
+                      _MetricRow(metric: metric),
+                      if (metric != section.metrics.last) const SizedBox(height: 10),
+                    ],
+                  ],
+                ),
+              ReadingResultSectionType.list => Column(
+                  children: [
+                    for (final item in section.items) ...[
+                      _ResultListItemCard(item: item),
+                      if (item != section.items.last) const SizedBox(height: 12),
+                    ],
+                  ],
+                ),
+            },
+          ],
+        ),
+      ),
+    );
   }
-  return null;
 }
 
-Map<String, dynamic> _findPayload(ReadingDetail detail, String payloadType) {
-  for (final payload in detail.payloads) {
-    if (payload.payloadType == payloadType) {
-      return payload.payloadJson;
-    }
+class _ResultTextCard extends StatelessWidget {
+  const _ResultTextCard({
+    required this.title,
+    required this.body,
+  });
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(body),
+          ],
+        ),
+      ),
+    );
   }
-  final sourcePayload = detail.reading.resultJson?['source_payload'];
-  if (sourcePayload is Map<String, dynamic>) {
-    return sourcePayload;
-  }
-  return <String, dynamic>{};
 }
 
-class _SajuBadge extends StatelessWidget {
-  const _SajuBadge({
+class _ResultBadge extends StatelessWidget {
+  const _ResultBadge({
     required this.label,
     required this.value,
   });
@@ -445,54 +367,22 @@ class _SajuBadge extends StatelessWidget {
   }
 }
 
-class _FiveElementsSection extends StatelessWidget {
-  const _FiveElementsSection({required this.elementCounts});
+class _MetricRow extends StatelessWidget {
+  const _MetricRow({required this.metric});
 
-  final Map<String, dynamic> elementCounts;
-
-  @override
-  Widget build(BuildContext context) {
-    final entries = [
-      ('wood', '목(木)'),
-      ('fire', '화(火)'),
-      ('earth', '토(土)'),
-      ('metal', '금(金)'),
-      ('water', '수(水)'),
-    ];
-
-    return Column(
-      children: [
-        for (final entry in entries) ...[
-          _ElementMeterRow(
-            label: entry.$2,
-            value: (elementCounts[entry.$1] as num?)?.toInt() ?? 0,
-          ),
-          if (entry != entries.last) const SizedBox(height: 10),
-        ],
-      ],
-    );
-  }
-}
-
-class _ElementMeterRow extends StatelessWidget {
-  const _ElementMeterRow({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final int value;
+  final ReadingResultMetric metric;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final normalized = (value.clamp(0, 4)) / 4;
+    final maxValue = metric.maxValue <= 0 ? 1 : metric.maxValue;
+    final normalized = (metric.value.clamp(0, maxValue)) / maxValue;
 
     return Row(
       children: [
         SizedBox(
           width: 64,
-          child: Text(label, style: theme.textTheme.bodyMedium),
+          child: Text(metric.label, style: theme.textTheme.bodyMedium),
         ),
         Expanded(
           child: ClipRRect(
@@ -507,7 +397,7 @@ class _ElementMeterRow extends StatelessWidget {
         SizedBox(
           width: 24,
           child: Text(
-            '$value',
+            '${metric.value}',
             textAlign: TextAlign.right,
             style: theme.textTheme.labelLarge,
           ),
@@ -517,26 +407,32 @@ class _ElementMeterRow extends StatelessWidget {
   }
 }
 
-class _ResultInfoCard extends StatelessWidget {
-  const _ResultInfoCard({
-    required this.title,
-    required this.body,
-  });
+class _ResultListItemCard extends StatelessWidget {
+  const _ResultListItemCard({required this.item});
 
-  final String title;
-  final String body;
+  final ReadingResultListItem item;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: item.color ?? Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(body),
+            Text(item.title, style: Theme.of(context).textTheme.titleSmall),
+            if (item.subtitle != null) ...[
+              const SizedBox(height: 6),
+              Text(item.subtitle!, style: Theme.of(context).textTheme.labelLarge),
+            ],
+            if (item.body != null) ...[
+              const SizedBox(height: 6),
+              Text(item.body!),
+            ],
           ],
         ),
       ),
@@ -551,308 +447,7 @@ String _divinationCodeFromRow(Map<String, dynamic> row) {
 
 String _divinationNameFromRow(Map<String, dynamic> row) {
   final type = row['divination_types'] as Map<String, dynamic>?;
-  return (type?['display_name'] ?? type?['name'] ?? '점술') as String;
-}
-
-String _elementLabel(String value) {
-  return switch (value) {
-    'wood' => '목(木)',
-    'fire' => '화(火)',
-    'earth' => '토(土)',
-    'metal' => '금(金)',
-    'water' => '수(水)',
-    _ => value,
-  };
-}
-
-String _seasonLabel(String value) {
-  return switch (value) {
-    'spring' => '봄',
-    'summer' => '여름',
-    'autumn' => '가을',
-    'winter' => '겨울',
-    _ => value,
-  };
-}
-
-String _zodiacElementLabel(String value) {
-  return switch (value) {
-    'fire' => '불',
-    'earth' => '흙',
-    'air' => '바람',
-    'water' => '물',
-    _ => value,
-  };
-}
-
-String _modalityLabel(String value) {
-  return switch (value) {
-    'cardinal' => '시작형',
-    'fixed' => '고정형',
-    'mutable' => '변화형',
-    _ => value,
-  };
-}
-
-class _DivinationHeroImage extends StatelessWidget {
-  const _DivinationHeroImage({required this.detail});
-
-  final ReadingDetail detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final assetPath = _heroAssetPath(detail.divinationCode);
-    if (assetPath == null) {
-      return const SizedBox.shrink();
-    }
-
-    final metadata = _heroMetadata(detail);
-    final accentColor = _heroAccentColor(detail.divinationCode, metadata);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: AspectRatio(
-        aspectRatio: 3 / 4,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.asset(
-              assetPath,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  ),
-                );
-              },
-            ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.08),
-                    Colors.black.withValues(alpha: 0.18),
-                    Colors.black.withValues(alpha: 0.76),
-                  ],
-                  stops: const [0.0, 0.52, 1.0],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _HeroPill(
-                    label: detail.divinationDisplayName,
-                    color: accentColor,
-                  ),
-                  const Spacer(),
-                  Text(
-                    metadata.title,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  if (metadata.subtitle != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      metadata.subtitle!,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.92),
-                          ),
-                    ),
-                  ],
-                  if (metadata.tags.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final tag in metadata.tags)
-                          _HeroPill(
-                            label: tag,
-                            color: accentColor.withValues(alpha: 0.92),
-                          ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroMetadata {
-  const _HeroMetadata({
-    required this.title,
-    required this.tags,
-    this.subtitle,
-  });
-
-  final String title;
-  final String? subtitle;
-  final List<String> tags;
-}
-
-class _HeroPill extends StatelessWidget {
-  const _HeroPill({
-    required this.label,
-    required this.color,
-  });
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-      ),
-    );
-  }
-}
-
-String? _heroAssetPath(String divinationCode) {
-  return switch (divinationCode) {
-    'saju' => 'assets/divinations/saju.png',
-    'omikuji' => 'assets/divinations/omikuji.png',
-    'rune' => 'assets/divinations/rune.png',
-    'zodiac' => 'assets/divinations/zodiac.png',
-    _ => null,
-  };
-}
-
-_HeroMetadata _heroMetadata(ReadingDetail detail) {
-  final payload = switch (detail.divinationCode) {
-    'saju' => _findSajuPayload(detail.payloads) ??
-        _findPayload(detail, 'saju_chart'),
-    'zodiac' => _findPayload(detail, 'zodiac_profile'),
-    'rune' => _findPayload(detail, 'rune_cast'),
-    'omikuji' => _findPayload(detail, 'omikuji_draw'),
-    _ => const <String, dynamic>{},
-  };
-
-  switch (detail.divinationCode) {
-    case 'saju':
-      final dominantElement = payload['dominant_element'] as String?;
-      final zodiacAnimal = payload['zodiac_animal'] as String?;
-      final season = payload['season'] as String?;
-      final yinYang = payload['yin_yang'] as String?;
-      return _HeroMetadata(
-        title: zodiacAnimal ?? detail.divinationDisplayName,
-        subtitle: dominantElement?.toUpperCase(),
-        tags: [
-          if (season != null) season.toUpperCase(),
-          if (yinYang != null) yinYang.toUpperCase(),
-        ],
-      );
-    case 'zodiac':
-      final sign = payload['display_name'] as String?;
-      final element = payload['element'] as String?;
-      final modality = payload['modality'] as String?;
-      return _HeroMetadata(
-        title: sign ?? detail.divinationDisplayName,
-        subtitle: payload['trait'] as String?,
-        tags: [
-          if (element != null) element.toUpperCase(),
-          if (modality != null) modality.toUpperCase(),
-        ],
-      );
-    case 'rune':
-      final selectedRunes = payload['selected_runes'] is List
-          ? payload['selected_runes'] as List<dynamic>
-          : const [];
-      final firstRune = selectedRunes.isNotEmpty &&
-              selectedRunes.first is Map<String, dynamic>
-          ? selectedRunes.first as Map<String, dynamic>
-          : const <String, dynamic>{};
-      return _HeroMetadata(
-        title: (firstRune['name'] as String?) ?? detail.divinationDisplayName,
-        subtitle: firstRune['meaning'] as String?,
-        tags: [
-          for (final rune in selectedRunes)
-            if (rune is Map<String, dynamic>)
-              (rune['keyword'] as String?) ??
-                  (rune['name'] as String?) ??
-                  'Rune',
-        ],
-      );
-    case 'omikuji':
-      final fortune = payload['fortune_label'] as String?;
-      final focus = payload['focus'] as String?;
-      return _HeroMetadata(
-        title: fortune ?? detail.divinationDisplayName,
-        subtitle: focus,
-        tags: [
-          if (payload['fortune_code'] is String)
-            (payload['fortune_code'] as String).toUpperCase(),
-        ],
-      );
-    default:
-      return _HeroMetadata(
-        title: detail.divinationDisplayName,
-        tags: const [],
-      );
-  }
-}
-
-Color _heroAccentColor(String divinationCode, _HeroMetadata metadata) {
-  switch (divinationCode) {
-    case 'saju':
-      final key = metadata.subtitle ?? '';
-      if (key.contains('WOOD')) return const Color(0xFF2F7D4A);
-      if (key.contains('FIRE')) return const Color(0xFFB7482E);
-      if (key.contains('EARTH')) return const Color(0xFFA06A2A);
-      if (key.contains('METAL')) return const Color(0xFF5B6470);
-      if (key.contains('WATER')) return const Color(0xFF2E5B9A);
-      return const Color(0xFF5A6B87);
-    case 'zodiac':
-      final joined = metadata.tags.join(' ');
-      if (joined.contains('FIRE')) {
-        return const Color(0xFFBC5A3C);
-      }
-      if (joined.contains('EARTH')) {
-        return const Color(0xFFA07A3B);
-      }
-      if (joined.contains('AIR')) {
-        return const Color(0xFF547AA5);
-      }
-      if (joined.contains('WATER')) {
-        return const Color(0xFF2B5C88);
-      }
-      return const Color(0xFF7A5FB2);
-    case 'omikuji':
-      final title = metadata.title.toLowerCase();
-      if (title.contains('daikichi')) return const Color(0xFFB8892F);
-      if (title.contains('kichi')) return const Color(0xFF4F8A4C);
-      if (title.contains('kyo')) return const Color(0xFF8A3F3F);
-      return const Color(0xFF8D6A39);
-    case 'rune':
-      return const Color(0xFF5077B4);
-    default:
-      return const Color(0xFF5A6B87);
-  }
+  return (type?['display_name'] ?? type?['name'] ?? 'Divination') as String;
 }
 
 class _ReadingCardGrid extends StatelessWidget {
@@ -926,9 +521,6 @@ class _TarotCardImage extends StatelessWidget {
     final imageRef = card.imageUrl;
     if (imageRef != null && imageRef.isNotEmpty) {
       final assetPath = _localAssetPath(imageRef);
-      debugPrint(
-        '[TarotImage] code=${card.cardCode} imageRef=$imageRef assetPath=$assetPath',
-      );
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: assetPath == null
@@ -936,9 +528,6 @@ class _TarotCardImage extends StatelessWidget {
                 imageRef,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
-                  debugPrint(
-                    '[TarotImage] network load failed code=${card.cardCode} imageRef=$imageRef error=$error',
-                  );
                   return _FallbackTarotCard(card: card);
                 },
               )
@@ -946,15 +535,12 @@ class _TarotCardImage extends StatelessWidget {
                 assetPath,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
-                  debugPrint(
-                    '[TarotImage] asset load failed code=${card.cardCode} assetPath=$assetPath error=$error',
-                  );
                   return _FallbackTarotCard(card: card);
                 },
               ),
       );
     }
-    debugPrint('[TarotImage] missing imageRef code=${card.cardCode}');
+
     return _FallbackTarotCard(card: card);
   }
 }
@@ -1034,9 +620,9 @@ class _FallbackTarotCard extends StatelessWidget {
 
 String _orientationLabel(String orientation) {
   return switch (orientation) {
-    'upright' => '정방향',
-    'reversed' => '역방향',
-    _ => '기본',
+    'upright' => 'Upright',
+    'reversed' => 'Reversed',
+    _ => 'Default',
   };
 }
 
@@ -1056,7 +642,7 @@ String _orientationSymbol(String orientation) {
     (const Color(0xFFECE8D8), const Color(0xFF5A4222)),
     (const Color(0xFFE7EEF2), const Color(0xFF8A3B3B)),
   ];
-  final index = code.codeUnits.fold<int>(0, (value, unit) => value + unit) %
-      palettes.length;
+  final index =
+      code.codeUnits.fold<int>(0, (value, unit) => value + unit) % palettes.length;
   return palettes[index];
 }

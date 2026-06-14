@@ -131,6 +131,15 @@ export async function incrementDailyUsage(
 function shouldEnforceUsageLimit(
   field: 'free_reading_count' | 'ai_reading_count',
 ): boolean {
+  const disableAllDailyLimits = Deno.env.get('DISABLE_DAILY_USAGE_LIMIT');
+  if (disableAllDailyLimits == null) {
+    return false;
+  }
+
+  if (disableAllDailyLimits === 'true') {
+    return false;
+  }
+
   if (field !== 'free_reading_count') {
     return true;
   }

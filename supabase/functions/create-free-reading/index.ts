@@ -27,7 +27,7 @@ Deno.serve(async (request) => {
     const body = await request.json();
     const readingRequest = normalizeRequest(body);
 
-    await incrementDailyUsage(client, userId, 'free_reading_count', 10);
+    await incrementDailyUsage(client, userId, 'free_reading_count', 5);
     const divinationType = await getDivinationType(client, readingRequest.divination_type_code);
     let reading;
 
