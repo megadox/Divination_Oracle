@@ -14,15 +14,15 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Divination'),
+        title: const Text('점술'),
         actions: [
           IconButton(
-            tooltip: 'History',
+            tooltip: '기록',
             onPressed: () => context.push('/history'),
             icon: const Icon(Icons.history),
           ),
           IconButton(
-            tooltip: 'Plus',
+            tooltip: '플러스',
             onPressed: () => context.push('/plus'),
             icon: const Icon(Icons.auto_awesome),
           ),
