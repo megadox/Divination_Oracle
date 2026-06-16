@@ -1,6 +1,7 @@
 param(
   [string]$SupabaseUrl = "",
   [string]$SupabaseAnonKey = $env:SUPABASE_ANON_KEY,
+  [string]$DisableFreeReadingLimit = "",
   [ValidateSet("chrome", "edge", "web-server")]
   [string]$Device = "chrome",
   [int]$WebPort = 8080
@@ -32,6 +33,10 @@ if (Test-Path $envPath) {
     if ($name -eq "SUPABASE_ANON_KEY" -and [string]::IsNullOrWhiteSpace($SupabaseAnonKey)) {
       $SupabaseAnonKey = $value
     }
+
+    if ($name -eq "DISABLE_FREE_READING_LIMIT" -and [string]::IsNullOrWhiteSpace($DisableFreeReadingLimit)) {
+      $DisableFreeReadingLimit = $value
+    }
   }
 }
 
@@ -55,9 +60,14 @@ if (-not (Test-Path $webDir)) {
 
 flutter pub get
 
+if ([string]::IsNullOrWhiteSpace($DisableFreeReadingLimit)) {
+  $DisableFreeReadingLimit = "true"
+}
+
 $commonArgs = @(
   "--dart-define=SUPABASE_URL=$SupabaseUrl",
-  "--dart-define=SUPABASE_ANON_KEY=$SupabaseAnonKey"
+  "--dart-define=SUPABASE_ANON_KEY=$SupabaseAnonKey",
+  "--dart-define=DISABLE_FREE_READING_LIMIT=$DisableFreeReadingLimit"
 )
 
 if ($Device -eq "web-server") {

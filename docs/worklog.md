@@ -410,3 +410,193 @@ project/
   3. 사주 원국 계산 고도화
   4. 룬/오미쿠지/별자리 결과 문구 고도화
   5. Plus 성공 호출 검증과 AI 응답 품질 점검
+
+## 2026-06-13
+
+- 비타로 점술 이미지 표시 1차 확장
+  - `saju`, `omikuji`, `rune`, `zodiac` 대표 이미지를 Flutter asset으로 추가
+  - asset 경로: `app/flutter_app/assets/divinations/`
+  - `pubspec.yaml`에 `assets/divinations/` 등록
+- 결과 화면 이미지 노출 구조 확장
+  - `reading_result_screen.dart`에서 타로 외 점술도 결과 상단에 전용 이미지를 표시하도록 반영
+  - 타로는 기존 카드 이미지 표시 흐름 유지
+- Android 테스트 APK 생성
+  - `flutter build apk --release`
+  - 산출물: `app/flutter_app/build/app/outputs/flutter-apk/app-release.apk`
+- 로컬 Android 빌드 환경 이슈 대응
+  - 손상된 NDK 폴더(`C:\Users\megad\AppData\Local\Android\Sdk\ndk\28.2.13676358`) 제거 후 Gradle 재다운로드로 복구
+- 검증
+  - `flutter analyze` 통과
+  - `flutter test` 통과
+
+## 2026-06-13 추가 진행
+
+- 비타로 점술 결과 이미지 개인화 2차 확장
+  - 대표 이미지 1장 고정 표시에서 payload 기반 hero overlay 방식으로 확장
+  - `saju`: dominant element, zodiac animal, season, yin/yang 반영
+  - `zodiac`: resolved sign, element, modality 반영
+  - `rune`: selected rune set 중심 요약 반영
+  - `omikuji`: fortune grade, focus 반영
+- 설계 메모 추가
+  - `docs/divination_result_image_plan.md`
+- Android 테스트 APK 재생성
+  - 산출물 갱신: `app/flutter_app/build/app/outputs/flutter-apk/app-release.apk`
+- 검증
+  - `flutter analyze` 통과
+  - `flutter test` 통과
+
+## 2026-06-14
+
+- 메인 화면 버전 정보 표시 추가
+  - `package_info_plus` 의존성 추가
+  - 메인 화면 하단에 `App Version` 카드 추가
+  - 표시 형식: `Version <version> (<buildNumber>)`
+- 서버 배포 필요 여부 정리
+  - Flutter UI만 바뀐 경우에는 앱 재빌드만으로 반영 가능
+  - Supabase Edge Function, migration, server-side usage limit 로직이 바뀐 경우에는 서버 배포가 필요
+  - 최근 무료 해석 limit 관련 변경은 `create-free-reading`, `_shared/readings.ts` 수정이 포함되어 서버 배포 필요
+- 서버 배포 절차 정리
+  1. Node.js, npm, Supabase CLI 사용 가능 여부 확인
+  2. 프로젝트 루트에서 `npx supabase login`
+  3. 프로젝트 연결 확인: `npx supabase link --project-ref <project-ref>`
+  4. migration 반영이 있으면 `npx supabase db push`
+  5. 함수 배포: `npx supabase functions deploy create-free-reading`
+  6. 함수 배포: `npx supabase functions deploy create-ai-reading`
+  7. 필요 시 추가 함수도 동일하게 deploy
+  8. 배포 후 앱 또는 스크립트로 실제 호출 검증
+- 로컬 실행 환경 점검
+  - 현재 작업 세션에서는 `node`, `npm`, `npx`, `supabase`, `deno`가 PATH에 없어 서버 재배포는 실행하지 못함
+- APK 빌드 전용 스크립트 추가
+  - `scripts/build_flutter_apk.ps1`
+  - `.env`에서 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `DISABLE_FREE_READING_LIMIT`를 읽어 APK 빌드 시 dart-define으로 전달
+  - 기본 빌드 모드는 `release`
+  - powershell -ExecutionPolicy Bypass -File scripts\build_flutter_apk.ps1
+## Todo next
+
+- Add settings entry points to `HistoryScreen` and `ReadingResultScreen`
+- Expand `SettingsScreen` with deployment checklist and server verification notes
+- Continue reducing screen responsibility by moving more result/history loading logic into dedicated controllers
+- Consider adding a dedicated `AiResultScreen` route and flow if Plus AI output needs a separate presentation layer
+- Review whether `HistoryScreen` and `ReadingResultScreen` should share more of the common result model / registry path
+- Continue improving Saju calculation depth beyond the current draft rule-based version
+- Continue improving Zodiac / Rune / Omikuji copy quality and payload richness
+- Revisit remaining `Upgrade_architecture.md` gaps:
+  - normalized divination registry coverage across more screens
+  - deeper astrology engine
+  - fuller structured result modeling across server + client
+
+## 2026-06-14 Settings screen
+
+- Added `SettingsScreen`
+  - route: `/settings`
+  - screen shows app version, package name, build mode, Supabase config status, and usage limit configuration
+- Updated home entry points
+  - added settings button to the home app bar
+  - home now points users to Settings for version/build/runtime checks
+- Validation
+  - `flutter analyze` PASS
+  - `flutter test` PASS
+
+## 2026-06-14 Reading flow controller expansion
+
+- Continued the next architecture step after staged reading flow split
+- Expanded `ReadingFlowController`
+  - now handles authenticated reading submission
+  - now calls `createFreeReading` / `createAiReading`
+  - now invalidates `dailyUsageProvider`
+  - now resets draft state after successful submission
+- Simplified `divination_reading_screen.dart`
+  - removed direct auth and repository submit responsibility from the screen
+  - screen now gathers divination-specific inputs and delegates submission to controller
+- Validation
+  - `flutter analyze` PASS
+  - `flutter test` PASS
+
+## 2026-06-14 Reading flow split
+
+- Continued the next architecture step after input registry alignment
+- Added common draft state for reading flow
+  - `reading_draft.dart`
+  - `reading_flow_controller.dart`
+- Added separate common question step
+  - `question_input_screen.dart`
+  - stores `question`, `category`, and `useAi` before entering divination-specific input
+- Split reading routes into staged flow
+  - `/reading/:code` now redirects to `/reading/:code/question`
+  - added `/reading/:code/question`
+  - added `/reading/:code/input`
+- Updated intro and home CTA flow
+  - start buttons now enter the question step first
+- Refactored divination-specific input screens
+  - common question/category/mode inputs removed from per-divination input widgets
+  - input screens now consume shared draft state and focus on divination-specific fields
+  - input screens show a shared summary card with an edit action back to the question step
+- Validation
+  - `flutter analyze` PASS
+  - `flutter test` PASS
+
+## 2026-06-14 Input registry alignment
+
+- Continued the next architecture step after result registry alignment
+- Added shared input registry layer under `app/flutter_app/lib/src/divinations/shared/`
+  - `divination_input_definition.dart`
+  - `divination_input_registry.dart`
+  - `divination_input_widgets.dart`
+- Added per-divination input widgets
+  - `tarot_input_widget.dart`
+  - `saju_input_widget.dart`
+  - `zodiac_input_widget.dart`
+  - `rune_input_widget.dart`
+  - `omikuji_input_widget.dart`
+- Refactored `divination_reading_screen.dart`
+  - screen now delegates divination-specific input UI selection to registry
+  - shared reading state and submit handlers remain in one controller screen
+  - unsupported divination codes now fall back to a dedicated placeholder screen
+- Validation
+  - `flutter analyze` PASS
+  - `flutter test` PASS
+
+## 2026-06-14 Result registry alignment
+
+- Continued the next architecture step after catalog/history alignment
+- Added a shared result presentation layer under `app/flutter_app/lib/src/divinations/shared/`
+  - `divination_definition.dart`
+  - `divination_registry.dart`
+  - `reading_result_mapper.dart`
+  - `reading_result_section.dart`
+- Added shared reading detail domain model
+  - `reading_detail.dart`
+- Refactored `reading_result_screen.dart`
+  - moved divination-specific result logic out of the screen
+  - screen now renders a common result skeleton plus registry-driven sections
+  - hero image, badges, metrics, and list sections are now built through registry definitions
+- Registered result builders for:
+  - `tarot`
+  - `saju`
+  - `zodiac`
+  - `rune`
+  - `omikuji`
+- Validation
+  - `flutter analyze` PASS
+  - `flutter test` PASS
+
+## 2026-06-14 Architecture alignment
+
+- Reviewed current implementation against `docs/Upgrade_architecture.md`
+- Confirmed major remaining gaps are:
+  - Flutter still reading divination catalog/detail directly from DB
+  - reading history API and filtered history UI were not implemented
+  - larger phase items such as normalized divination registry, deeper astrology engine, and full saju calculation are still pending
+- Implemented catalog/detail integration through Edge Functions
+  - Flutter `DivinationRepository.fetchTypes()` now uses `get-divination-catalog`
+  - Flutter detail lookup now uses `get-divination-detail`
+  - added `DivinationDetail` and `DivinationInputDefinition` model support
+  - intro screen now renders server-driven input definitions and tarot spreads from detail payload
+- Implemented reading history API and UI filtering
+  - added Supabase Edge Function `get-reading-history`
+  - history now filters by divination type and result mode
+  - reading model now carries joined divination metadata for list rendering
+- Validation
+  - `flutter analyze` PASS
+  - `flutter test` PASS
+  - `deno` command unavailable in current shell, so Edge Function type check was not run locally

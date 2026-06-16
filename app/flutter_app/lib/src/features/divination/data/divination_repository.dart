@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../domain/daily_usage.dart';
+import '../domain/divination_detail.dart';
 import '../domain/divination_type.dart';
 import '../domain/reading.dart';
 import '../domain/tarot_spread.dart';
@@ -11,38 +12,24 @@ class DivinationRepository {
   final SupabaseClient _client;
 
   Future<List<DivinationType>> fetchTypes() async {
-    final rows = await _client
-        .from('divination_types')
-        .select()
-        .eq('is_active', true)
-        .order('sort_order');
+    final response = await _client.functions.invoke('get-divination-catalog');
+    final rows = (response.data as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
     return rows.map(DivinationType.fromJson).toList();
   }
 
-  Future<DivinationType> fetchTypeByCode(String code) async {
-    final row = await _client
-        .from('divination_types')
-        .select()
-        .eq('code', code)
-        .eq('is_active', true)
-        .single();
-    return DivinationType.fromJson(row);
+  Future<DivinationDetail> fetchTypeDetail(String code) async {
+    final response = await _client.functions.invoke(
+      'get-divination-detail',
+      body: {'code': code},
+    );
+    return DivinationDetail.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<List<TarotSpread>> fetchTarotSpreads() async {
-    final tarotType = await _client
-        .from('divination_types')
-        .select('id')
-        .eq('code', 'tarot')
-        .eq('is_active', true)
-        .single();
-    final rows = await _client
-        .from('spreads')
-        .select()
-        .eq('divination_type_id', tarotType['id'] as String)
-        .eq('is_active', true)
-        .order('sort_order');
-    return rows.map(TarotSpread.fromJson).toList();
+    final detail = await fetchTypeDetail('tarot');
+    return detail.spreads;
   }
 
   Future<DailyUsage> fetchTodayUsage() async {
@@ -99,5 +86,26 @@ class DivinationRepository {
       },
     );
     return Reading.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<List<Reading>> fetchReadingHistory({
+    String? divinationCode,
+    String? resultType,
+    int limit = 30,
+  }) async {
+    final response = await _client.functions.invoke(
+      'get-reading-history',
+      body: {
+        if (divinationCode != null && divinationCode.isNotEmpty)
+          'divination_code': divinationCode,
+        if (resultType != null && resultType.isNotEmpty) 'result_type': resultType,
+        'limit': limit,
+      },
+    );
+
+    final rows = (response.data as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    return rows.map(Reading.fromJson).toList();
   }
 }

@@ -8,6 +8,8 @@ class Reading {
     required this.spreadCode,
     this.question,
     this.resultJson,
+    this.divinationCode,
+    this.divinationDisplayName,
   });
 
   final String id;
@@ -18,8 +20,12 @@ class Reading {
   final String spreadCode;
   final String? question;
   final Map<String, dynamic>? resultJson;
+  final String? divinationCode;
+  final String? divinationDisplayName;
 
   factory Reading.fromJson(Map<String, dynamic> json) {
+    final divinationType = json['divination_types'] as Map<String, dynamic>?;
+
     return Reading(
       id: json['id'] as String,
       resultType: json['result_type'] as String,
@@ -31,6 +37,9 @@ class Reading {
       resultJson: json['result_json'] is Map<String, dynamic>
           ? json['result_json'] as Map<String, dynamic>
           : null,
+      divinationCode: divinationType?['code'] as String?,
+      divinationDisplayName:
+          (divinationType?['display_name'] ?? divinationType?['name']) as String?,
     );
   }
 }

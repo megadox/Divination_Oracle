@@ -235,6 +235,13 @@ cd E:\Project\Divination_app
 powershell -ExecutionPolicy Bypass -File scripts\run_flutter_android.ps1
 ```
 
+Android APK 빌드 스크립트:
+
+```powershell
+cd E:\Project\Divination_app
+powershell -ExecutionPolicy Bypass -File scripts\build_flutter_apk.ps1
+```
+
 특정 에뮬레이터나 기기를 지정하려면:
 
 ```powershell

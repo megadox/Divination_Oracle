@@ -2,7 +2,8 @@ param(
   [string]$SupabaseUrl = "",
   [string]$SupabaseAnonKey = $env:SUPABASE_ANON_KEY,
   [string]$DisableFreeReadingLimit = "",
-  [string]$Device = ""
+  [ValidateSet("release", "debug", "profile")]
+  [string]$BuildMode = "release"
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,8 +64,15 @@ $commonArgs = @(
   "--dart-define=DISABLE_FREE_READING_LIMIT=$DisableFreeReadingLimit"
 )
 
-if ([string]::IsNullOrWhiteSpace($Device)) {
-  flutter run @commonArgs
+$buildArgs = @("build", "apk", "--$BuildMode") + $commonArgs
+
+flutter @buildArgs
+
+$outputName = if ($BuildMode -eq "release") { "app-release.apk" } elseif ($BuildMode -eq "debug") { "app-debug.apk" } else { "app-profile.apk" }
+$outputPath = Join-Path $flutterAppDir "build\app\outputs\flutter-apk\$outputName"
+
+if (Test-Path $outputPath) {
+  Write-Host "APK built: $outputPath"
 } else {
-  flutter run -d $Device @commonArgs
+  throw "APK output not found: $outputPath"
 }
