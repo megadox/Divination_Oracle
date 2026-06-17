@@ -1,0 +1,14 @@
+{
+  "version": "5",
+  "remote": {
+    "https://esm.sh/@supabase/supabase-js@2.45.3": "120c64e8b607f0c23cfaa2b418b51c4d235edb1e6f40087a080b67a83c6f64b8",
+    "https://esm.sh/openai@4.56.0": "659485a7c35ee2fa68d8b69f83f2a3c7d1e20198ac931d75e838373995538a42"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:supabase@^2.104.0"
+      ]
+    }
+  }
+}
