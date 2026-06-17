@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$SupabaseUrl = "",
   [string]$SupabaseAnonKey = "",
   [switch]$IncludeTarot

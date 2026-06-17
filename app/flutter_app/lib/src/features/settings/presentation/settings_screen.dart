@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/usage_limits.dart';
+import '../../../core/widgets/page_index_card.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -11,11 +13,22 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        title: const Text('Settings'),
+        actions: [
+          IconButton(
+            tooltip: 'Home',
+            onPressed: () => context.go('/'),
+            icon: const Icon(Icons.home_outlined),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            const PageIndexCard(index: 'p_7', label: 'Settings'),
+            const SizedBox(height: 16),
             const _SectionTitle('App'),
             const SizedBox(height: 12),
             FutureBuilder<PackageInfo>(

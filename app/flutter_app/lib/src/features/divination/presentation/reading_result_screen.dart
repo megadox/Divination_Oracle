@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/app_language.dart';
 import '../../../core/supabase/supabase_providers.dart';
+import '../../../core/widgets/page_index_card.dart';
 import '../../../divinations/shared/divination_definition.dart';
 import '../../../divinations/shared/reading_result_mapper.dart';
 import '../../../divinations/shared/reading_result_section.dart';
 import '../domain/reading.dart';
 import '../domain/reading_detail.dart';
+import 'divination_localizations.dart';
 
 final readingDetailProvider =
     FutureProvider.family<ReadingDetail, String>((ref, id) async {
@@ -45,33 +48,62 @@ class ReadingResultScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final language = ref.watch(appLanguageProvider);
     final detail = ref.watch(readingDetailProvider(readingId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Reading Result')),
+      appBar: AppBar(
+        title: Text(language == AppLanguage.ko ? '해석 결과' : 'Reading Result'),
+        actions: [
+          IconButton(
+            tooltip: language == AppLanguage.ko ? '홈' : 'Home',
+            onPressed: () => context.go('/'),
+            icon: const Icon(Icons.home_outlined),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: detail.when(
           data: (value) {
-            final model = mapReadingResult(value);
+            final model = mapReadingResult(value, language);
             return ListView(
               padding: const EdgeInsets.all(20),
               children: [
+                PageIndexCard(
+                  index: 'p_4',
+                  label: language == AppLanguage.ko ? '해석 결과' : 'Reading result',
+                ),
+                const SizedBox(height: 16),
                 Text(
                   model.displayModeLabel,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Divination: ${value.divinationDisplayName}',
+                  language == AppLanguage.ko
+                      ? '점술: ${localizedDivinationNameFromCode(value.divinationCode, value.divinationDisplayName, language)}'
+                      : 'Divination: ${localizedDivinationNameFromCode(value.divinationCode, value.divinationDisplayName, language)}',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 if (value.reading.question?.isNotEmpty == true) ...[
-                  Text('Question: ${value.reading.question}'),
+                  Text(
+                    language == AppLanguage.ko
+                        ? '질문: ${value.reading.question}'
+                        : 'Question: ${value.reading.question}',
+                  ),
                   const SizedBox(height: 8),
                 ],
-                Text('Spread: ${value.reading.spreadCode}'),
-                Text('Category: ${value.reading.category}'),
+                Text(
+                  language == AppLanguage.ko
+                      ? '스프레드: ${value.reading.spreadCode}'
+                      : 'Spread: ${value.reading.spreadCode}',
+                ),
+                Text(
+                  language == AppLanguage.ko
+                      ? '카테고리: ${_categoryLabel(value.reading.category, true)}'
+                      : 'Category: ${_categoryLabel(value.reading.category, false)}',
+                ),
                 if (model.hero != null) ...[
                   const SizedBox(height: 20),
                   _DivinationHero(hero: model.hero!),
@@ -85,7 +117,7 @@ class ReadingResultScreen extends ConsumerWidget {
                 ],
                 if (value.items.isNotEmpty) ...[
                   Text(
-                    'Source Items',
+                    language == AppLanguage.ko ? '출처 항목' : 'Source Items',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
@@ -93,32 +125,44 @@ class ReadingResultScreen extends ConsumerWidget {
                   const SizedBox(height: 20),
                 ],
                 if (model.summary != null)
-                  _ResultTextCard(title: 'Summary', body: model.summary!),
+                  _ResultTextCard(
+                    title: language == AppLanguage.ko ? '요약' : 'Summary',
+                    body: model.summary!,
+                  ),
                 if (model.summary != null) const SizedBox(height: 16),
                 if (model.detailedReading != null)
                   _ResultTextCard(
-                    title: 'Interpretation',
+                    title: language == AppLanguage.ko ? '해석' : 'Interpretation',
                     body: model.detailedReading!,
                   ),
                 if (model.detailedReading != null) const SizedBox(height: 16),
                 if (model.advice != null)
-                  _ResultTextCard(title: 'Advice', body: model.advice!),
+                  _ResultTextCard(
+                    title: language == AppLanguage.ko ? '조언' : 'Advice',
+                    body: model.advice!,
+                  ),
                 if (model.advice != null) const SizedBox(height: 16),
                 if (model.caution != null)
-                  _ResultTextCard(title: 'Caution', body: model.caution!),
+                  _ResultTextCard(
+                    title: language == AppLanguage.ko ? '주의' : 'Caution',
+                    body: model.caution!,
+                  ),
                 if (model.caution != null) const SizedBox(height: 16),
                 if (model.fallbackText != null)
-                  _ResultTextCard(title: 'Full Reading', body: model.fallbackText!),
+                  _ResultTextCard(
+                    title: language == AppLanguage.ko ? '전체 해석' : 'Full Reading',
+                    body: model.fallbackText!,
+                  ),
                 const SizedBox(height: 24),
                 OutlinedButton.icon(
                   onPressed: () => context.go('/'),
                   icon: const Icon(Icons.home_outlined),
-                  label: const Text('Go Home'),
+                  label: Text(language == AppLanguage.ko ? '메인으로 이동' : 'Go Home'),
                 ),
                 const SizedBox(height: 12),
                 FilledButton.tonal(
                   onPressed: () => context.pop(),
-                  child: const Text('Back'),
+                  child: Text(language == AppLanguage.ko ? '뒤로' : 'Back'),
                 ),
               ],
             );
@@ -450,6 +494,18 @@ String _divinationNameFromRow(Map<String, dynamic> row) {
   return (type?['display_name'] ?? type?['name'] ?? 'Divination') as String;
 }
 
+String _categoryLabel(String category, bool korean) {
+  return switch (category) {
+    'general' => korean ? '일반' : 'General',
+    'love' => korean ? '연애' : 'Love',
+    'career' => korean ? '직업' : 'Career',
+    'money' => korean ? '금전' : 'Money',
+    'health' => korean ? '건강' : 'Health',
+    'relationship' => korean ? '관계' : 'Relationship',
+    _ => category,
+  };
+}
+
 class _ReadingCardGrid extends StatelessWidget {
   const _ReadingCardGrid({required this.items});
 
@@ -487,6 +543,10 @@ class _TarotCardTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final language = ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(appLanguageProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -501,7 +561,7 @@ class _TarotCardTile extends StatelessWidget {
           style: theme.textTheme.labelLarge,
         ),
         Text(
-          '${card.cardName} / ${_orientationLabel(card.orientation)}',
+          '${card.cardName} / ${_orientationLabel(card.orientation, language)}',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.bodySmall,
@@ -618,11 +678,14 @@ class _FallbackTarotCard extends StatelessWidget {
   }
 }
 
-String _orientationLabel(String orientation) {
-  return switch (orientation) {
-    'upright' => 'Upright',
-    'reversed' => 'Reversed',
-    _ => 'Default',
+String _orientationLabel(String orientation, AppLanguage language) {
+  return switch ((orientation, language)) {
+    ('upright', AppLanguage.ko) => '정방향',
+    ('upright', AppLanguage.en) => 'Upright',
+    ('reversed', AppLanguage.ko) => '역방향',
+    ('reversed', AppLanguage.en) => 'Reversed',
+    (_, AppLanguage.ko) => '기본',
+    (_, AppLanguage.en) => 'Default',
   };
 }
 

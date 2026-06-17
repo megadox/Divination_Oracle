@@ -1,16 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/page_index_card.dart';
 class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Plus')),
+      appBar: AppBar(
+        title: const Text('Plus'),
+        actions: [
+          IconButton(
+            tooltip: 'Home',
+            onPressed: () => context.go('/'),
+            icon: const Icon(Icons.home_outlined),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: const [
+            PageIndexCard(index: 'p_6', label: 'Plus / Subscription'),
+            SizedBox(height: 16),
             Text(
               'Plus',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700),

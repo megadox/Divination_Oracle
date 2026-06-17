@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/app_language.dart';
 import '../../../divinations/shared/divination_input_definition.dart';
 import '../../../divinations/shared/divination_input_registry.dart';
 import '../application/divination_providers.dart';
@@ -24,6 +25,7 @@ class DivinationReadingScreen extends ConsumerStatefulWidget {
 
 class _DivinationReadingScreenState
     extends ConsumerState<DivinationReadingScreen> {
+  final _questionController = TextEditingController();
   final _sajuNameController = TextEditingController();
   final _zodiacNameController = TextEditingController();
 
@@ -39,6 +41,7 @@ class _DivinationReadingScreenState
 
   @override
   void dispose() {
+    _questionController.dispose();
     _sajuNameController.dispose();
     _zodiacNameController.dispose();
     super.dispose();
@@ -53,6 +56,7 @@ class _DivinationReadingScreenState
 
     final usage = ref.watch(dailyUsageProvider);
     final draft = ref.watch(readingFlowControllerProvider(widget.divinationCode));
+    final language = ref.watch(appLanguageProvider);
     final dailyUsage = usage.maybeWhen(
       data: (value) => value,
       orElse: () => DailyUsage.empty,
@@ -64,9 +68,11 @@ class _DivinationReadingScreenState
 
     final inputContext = DivinationInputContext(
       divinationCode: widget.divinationCode,
+      language: language,
       usage: usage,
       useAi: draft.useAi,
       question: draft.question,
+      questionController: _questionController..text = draft.question,
       isSubmitting: _isSubmitting,
       canSubmit: canSubmit,
       isFreeLimitReached: isFreeLimitReached,
@@ -82,12 +88,20 @@ class _DivinationReadingScreenState
       zodiacBirthDate: _zodiacBirthDate,
       runeDrawCount: _runeDrawCount,
       tarotSpreads: tarotSpreads,
+      onOpenHome: () => context.go('/'),
       onOpenHistory: () => context.push('/history'),
       onOpenPlus: () => context.push('/plus'),
-      onEditSetup: () => context.pop(),
-      onCategoryChanged: (_) {},
+      onEditSetup: () {},
+      onQuestionChanged: (value) => ref
+          .read(readingFlowControllerProvider(widget.divinationCode).notifier)
+          .setQuestion(value),
+      onCategoryChanged: (value) => ref
+          .read(readingFlowControllerProvider(widget.divinationCode).notifier)
+          .setCategory(value),
       onSpreadChanged: (value) => setState(() => _spreadCode = value),
-      onUseAiChanged: (_) {},
+      onUseAiChanged: (value) => ref
+          .read(readingFlowControllerProvider(widget.divinationCode).notifier)
+          .setUseAi(value),
       onSajuCalendarTypeChanged: (value) => setState(() => _sajuCalendarType = value),
       onSajuGenderChanged: (value) => setState(() => _sajuGender = value),
       onSajuBirthTimeUnknownChanged: (value) {
@@ -126,6 +140,9 @@ class _DivinationReadingScreenState
   }
 
   Future<void> _submitReading() async {
+    ref
+        .read(readingFlowControllerProvider(widget.divinationCode).notifier)
+        .setQuestion(_questionController.text);
     switch (widget.divinationCode) {
       case 'tarot':
         return _createTarotReading();

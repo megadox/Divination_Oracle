@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/localization/app_language.dart';
 import '../omikuji/omikuji_input_widget.dart';
 import '../rune/rune_input_widget.dart';
 import '../saju/saju_input_widget.dart';
@@ -30,14 +33,29 @@ class UnsupportedDivinationInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final language = ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(appLanguageProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(code)),
-      body: const SafeArea(
+      appBar: AppBar(
+        title: Text(code),
+        actions: [
+          IconButton(
+            tooltip: language == AppLanguage.ko ? '홈' : 'Home',
+            onPressed: () => context.go('/'),
+            icon: const Icon(Icons.home_outlined),
+          ),
+        ],
+      ),
+      body: SafeArea(
         child: Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             child: Text(
-              'This divination input screen is not available yet.',
+              language == AppLanguage.ko
+                  ? '이 점술의 입력 화면은 아직 준비되지 않았습니다.'
+                  : 'This divination input screen is not available yet.',
               textAlign: TextAlign.center,
             ),
           ),

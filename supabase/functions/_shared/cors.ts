@@ -9,7 +9,7 @@ export function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: {
       ...corsHeaders,
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
     },
   });
 }

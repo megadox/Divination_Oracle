@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/app_language.dart';
+import '../../../core/widgets/page_index_card.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../divination/application/divination_providers.dart';
 import '../../divination/domain/reading.dart';
@@ -29,6 +31,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final language = ref.watch(appLanguageProvider);
     final filters = ReadingHistoryFilters(
       divinationCode: _divinationCode,
       resultType: _resultType,
@@ -37,24 +40,40 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final types = ref.watch(divinationTypesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('History')),
+      appBar: AppBar(
+        title: Text(language == AppLanguage.ko ? '기록' : 'History'),
+        actions: [
+          IconButton(
+            tooltip: language == AppLanguage.ko ? '홈' : 'Home',
+            onPressed: () => context.go('/'),
+            icon: const Icon(Icons.home_outlined),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Column(
               children: [
+                PageIndexCard(
+                  index: 'p_5',
+                  label: language == AppLanguage.ko ? '리딩 기록' : 'Reading history',
+                ),
+                const SizedBox(height: 12),
                 types.when(
                   data: (items) => DropdownButtonFormField<String?>(
                     initialValue: _divinationCode,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       border: OutlineInputBorder(),
-                      labelText: 'Divination',
+                      labelText: language == AppLanguage.ko ? '점술' : 'Divination',
                     ),
                     items: [
-                      const DropdownMenuItem<String?>(
+                      DropdownMenuItem<String?>(
                         value: null,
-                        child: Text('All divinations'),
+                        child: Text(
+                          language == AppLanguage.ko ? '전체 점술' : 'All divinations',
+                        ),
                       ),
                       for (final item in items)
                         DropdownMenuItem<String?>(
@@ -70,20 +89,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String?>(
                   initialValue: _resultType,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     border: OutlineInputBorder(),
-                    labelText: 'Mode',
+                    labelText: language == AppLanguage.ko ? '모드' : 'Mode',
                   ),
-                  items: const [
+                  items: [
                     DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('All modes'),
+                      child: Text(language == AppLanguage.ko ? '전체 모드' : 'All modes'),
                     ),
                     DropdownMenuItem<String?>(
                       value: 'free',
-                      child: Text('Free'),
+                      child: Text(language == AppLanguage.ko ? '무료' : 'Free'),
                     ),
-                    DropdownMenuItem<String?>(
+                    const DropdownMenuItem<String?>(
                       value: 'plus_ai',
                       child: Text('Plus AI'),
                     ),
@@ -97,7 +116,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             child: readings.when(
               data: (items) {
                 if (items.isEmpty) {
-                  return const Center(child: Text('No reading history yet.'));
+                  return Center(
+                    child: Text(
+                      language == AppLanguage.ko
+                          ? '아직 리딩 기록이 없습니다.'
+                          : 'No reading history yet.',
+                    ),
+                  );
                 }
 
                 return ListView.separated(
@@ -107,7 +132,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     final item = items[index];
                     final title = item.question?.isNotEmpty == true
                         ? item.question!
-                        : 'No question';
+                        : (language == AppLanguage.ko ? '질문 없음' : 'No question');
                     final subtitleParts = <String>[
                       if ((item.divinationDisplayName ?? '').isNotEmpty)
                         item.divinationDisplayName!,

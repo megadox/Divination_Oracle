@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/app_language.dart';
+import '../../../core/widgets/page_index_card.dart';
 import '../application/divination_providers.dart';
 import '../domain/divination_input_definition.dart';
+import 'divination_localizations.dart';
 
 class DivinationIntroScreen extends ConsumerWidget {
   const DivinationIntroScreen({required this.code, super.key});
@@ -12,76 +15,101 @@ class DivinationIntroScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final language = ref.watch(appLanguageProvider);
     final detail = ref.watch(divinationTypeProvider(code));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Divination Guide')),
+      appBar: AppBar(
+        title: Text(language == AppLanguage.ko ? '점술 소개' : 'Divination Guide'),
+      ),
       body: SafeArea(
         child: detail.when(
           data: (value) => ListView(
             padding: const EdgeInsets.all(20),
             children: [
+              PageIndexCard(
+                index: 'p_2',
+                label: language == AppLanguage.ko ? '점술 소개' : 'Divination intro',
+              ),
+              const SizedBox(height: 16),
               Text(
-                value.type.displayName,
+                localizedDivinationDisplayName(value.type, language),
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 12),
               Text(
-                value.type.description ??
-                    value.type.shortDescription ??
-                    'Description is being prepared.',
+                localizedDivinationDescription(value.type, language),
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 20),
               _IntroInfoRow(
-                label: 'Input Mode',
-                value: _inputModeLabel(value.type.inputMode),
+                label: language == AppLanguage.ko ? '입력 방식' : 'Input Mode',
+                value: localizedInputModeDescription(
+                  value.type.inputMode,
+                  language,
+                ),
               ),
-              if (value.type.originRegion?.isNotEmpty == true)
-                _IntroInfoRow(label: 'Origin', value: value.type.originRegion!),
+              if (localizedDivinationOrigin(value.type, language).isNotEmpty)
+                _IntroInfoRow(
+                  label: language == AppLanguage.ko ? '기원' : 'Origin',
+                  value: localizedDivinationOrigin(value.type, language),
+                ),
               _IntroInfoRow(
-                label: 'Reading Mode',
-                value: _interpretationLabel(value.type.interpretationMode),
+                label: language == AppLanguage.ko ? '해석 방식' : 'Reading Mode',
+                value: localizedInterpretationLabel(
+                  value.type.interpretationMode,
+                  language,
+                ),
               ),
               const SizedBox(height: 20),
               _GuidanceCard(
-                title: 'How it works',
-                body: _flowDescription(code),
+                title: language == AppLanguage.ko ? '진행 방식' : 'How it works',
+                body: localizedFlowDescription(code, language),
               ),
               if (value.inputDefinitions.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 Text(
-                  'Input Fields',
+                  language == AppLanguage.ko ? '입력 항목' : 'Input Fields',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
                 for (final input in value.inputDefinitions) ...[
-                  _InputDefinitionTile(input: input),
+                  _InputDefinitionTile(input: input, language: language),
                   if (input != value.inputDefinitions.last) const Divider(),
                 ],
               ],
               if (value.spreads.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 Text(
-                  'Available Spreads',
+                  language == AppLanguage.ko
+                      ? '사용 가능한 스프레드'
+                      : 'Available Spreads',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
                 for (final spread in value.spreads) ...[
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text('${spread.name} (${spread.cardCount} cards)'),
-                    subtitle: Text(spread.description ?? ''),
+                    title: Text(
+                      language == AppLanguage.ko
+                          ? '${localizedSpreadName(spread, language)} (${spread.cardCount}장)'
+                          : '${localizedSpreadName(spread, language)} (${spread.cardCount} cards)',
+                    ),
+                    subtitle: Text(localizedSpreadDescription(spread, language)),
                   ),
                   if (spread != value.spreads.last) const Divider(),
                 ],
               ],
               const SizedBox(height: 28),
               FilledButton.icon(
-                onPressed: () => context.push('/reading/${value.type.code}/question'),
+                onPressed: () => context.push('/reading/${value.type.code}'),
                 icon: const Icon(Icons.arrow_forward),
                 label: Text(
-                  value.type.code == 'tarot' ? 'Start Tarot' : 'Start Reading',
+                  value.type.code == 'tarot'
+                      ? (language == AppLanguage.ko ? '타로 시작하기' : 'Start Tarot')
+                      : (language == AppLanguage.ko
+                            ? '점술 시작하기'
+                            : 'Start Reading'),
                 ),
               ),
             ],
@@ -95,21 +123,26 @@ class DivinationIntroScreen extends ConsumerWidget {
 }
 
 class _InputDefinitionTile extends StatelessWidget {
-  const _InputDefinitionTile({required this.input});
+  const _InputDefinitionTile({
+    required this.input,
+    required this.language,
+  });
 
   final DivinationInputDefinition input;
+  final AppLanguage language;
 
   @override
   Widget build(BuildContext context) {
     final metadata = <String>[
-      input.fieldType,
-      if (input.isRequired) 'required',
-      if ((input.helpText ?? '').isNotEmpty) input.helpText!,
+      localizedInputFieldType(input, language),
+      if (input.isRequired) language == AppLanguage.ko ? '필수' : 'Required',
+      if (localizedInputHelpText(input, language).isNotEmpty)
+        localizedInputHelpText(input, language),
     ];
 
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      title: Text(input.fieldLabel),
+      title: Text(localizedInputFieldLabel(input, language)),
       subtitle: Text(metadata.join(' | ')),
     );
   }
@@ -170,32 +203,3 @@ class _GuidanceCard extends StatelessWidget {
   }
 }
 
-String _inputModeLabel(String inputMode) {
-  return switch (inputMode) {
-    'draw_based' => 'Draw items first, then interpret the result.',
-    'birth_data_based' => 'Calculate from birth date and time input.',
-    'hybrid' => 'Combine user input with built-in rules.',
-    _ => 'Configuration is being prepared.',
-  };
-}
-
-String _interpretationLabel(String interpretationMode) {
-  return switch (interpretationMode) {
-    'lookup_plus_ai' => 'Static reading with optional Plus AI expansion',
-    'rule_plus_ai' => 'Rule-based reading with optional Plus AI expansion',
-    'rule_based' => 'Rule-based free reading',
-    'prewritten_lookup' => 'Prewritten reading lookup',
-    _ => 'Configuration is being prepared.',
-  };
-}
-
-String _flowDescription(String code) {
-  return switch (code) {
-    'tarot' => 'Enter a question, choose a spread, draw cards, and review the reading.',
-    'saju' => 'Enter birth data, calculate the chart, and review the free or AI reading.',
-    'zodiac' => 'Enter birth date, resolve the sign, and review the personality summary.',
-    'rune' => 'Draw one or more runes and review the guidance for the current situation.',
-    'omikuji' => 'Draw a fortune slip and review the grade and focus areas.',
-    _ => 'Each divination follows the same overall input and result flow.',
-  };
-}

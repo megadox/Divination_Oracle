@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/app_language.dart';
+import '../../../core/widgets/page_index_card.dart';
 import '../application/divination_providers.dart';
 import '../application/reading_flow_controller.dart';
+import 'divination_localizations.dart';
 
 class QuestionInputScreen extends ConsumerStatefulWidget {
   const QuestionInputScreen({required this.divinationCode, super.key});
@@ -36,22 +39,39 @@ class _QuestionInputScreenState extends ConsumerState<QuestionInputScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final language = ref.watch(appLanguageProvider);
     final detail = ref.watch(divinationTypeProvider(widget.divinationCode));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Question')),
+      appBar: AppBar(
+        title: Text(language == AppLanguage.ko ? '질문 설정' : 'Question'),
+        actions: [
+          IconButton(
+            tooltip: language == AppLanguage.ko ? '홈' : 'Home',
+            onPressed: () => context.go('/'),
+            icon: const Icon(Icons.home_outlined),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: detail.when(
           data: (value) => ListView(
             padding: const EdgeInsets.all(20),
             children: [
+              PageIndexCard(
+                index: 'p_3',
+                label: language == AppLanguage.ko ? '질문 입력' : 'Question step',
+              ),
+              const SizedBox(height: 16),
               Text(
-                value.type.displayName,
+                localizedDivinationDisplayName(value.type, language),
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 12),
               Text(
-                'Set your question and mode first, then continue to the divination-specific input step.',
+                language == AppLanguage.ko
+                    ? '질문과 해석 모드를 먼저 정한 뒤, 점술별 입력 단계로 진행하세요.'
+                    : 'Set your question and mode first, then continue to the divination-specific input step.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 20),
@@ -59,26 +79,46 @@ class _QuestionInputScreenState extends ConsumerState<QuestionInputScreen> {
                 controller: _questionController,
                 minLines: 3,
                 maxLines: 5,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   border: OutlineInputBorder(),
-                  labelText: 'Question',
-                  hintText: 'You can leave this blank if you want a general reading.',
+                  labelText: language == AppLanguage.ko ? '질문' : 'Question',
+                  hintText: language == AppLanguage.ko
+                      ? '일반 흐름만 보고 싶다면 비워둘 수 있습니다.'
+                      : 'You can leave this blank if you want a general reading.',
                 ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _category,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   border: OutlineInputBorder(),
-                  labelText: 'Category',
+                  labelText: language == AppLanguage.ko ? '카테고리' : 'Category',
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'general', child: Text('General')),
-                  DropdownMenuItem(value: 'love', child: Text('Love')),
-                  DropdownMenuItem(value: 'career', child: Text('Career')),
-                  DropdownMenuItem(value: 'money', child: Text('Money')),
-                  DropdownMenuItem(value: 'health', child: Text('Health')),
-                  DropdownMenuItem(value: 'relationship', child: Text('Relationship')),
+                items: [
+                  DropdownMenuItem(
+                    value: 'general',
+                    child: Text(language == AppLanguage.ko ? '일반' : 'General'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'love',
+                    child: Text(language == AppLanguage.ko ? '연애' : 'Love'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'career',
+                    child: Text(language == AppLanguage.ko ? '직업' : 'Career'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'money',
+                    child: Text(language == AppLanguage.ko ? '금전' : 'Money'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'health',
+                    child: Text(language == AppLanguage.ko ? '건강' : 'Health'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'relationship',
+                    child: Text(language == AppLanguage.ko ? '관계' : 'Relationship'),
+                  ),
                 ],
                 onChanged: (value) {
                   if (value != null) {
@@ -88,16 +128,16 @@ class _QuestionInputScreenState extends ConsumerState<QuestionInputScreen> {
               ),
               const SizedBox(height: 12),
               SegmentedButton<bool>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: false,
-                    icon: Icon(Icons.style),
-                    label: Text('Free'),
+                    icon: const Icon(Icons.style),
+                    label: Text(language == AppLanguage.ko ? '무료' : 'Free'),
                   ),
                   ButtonSegment(
                     value: true,
-                    icon: Icon(Icons.auto_awesome),
-                    label: Text('AI'),
+                    icon: const Icon(Icons.auto_awesome),
+                    label: Text(language == AppLanguage.ko ? 'AI' : 'AI'),
                   ),
                 ],
                 selected: {_useAi},
@@ -109,7 +149,13 @@ class _QuestionInputScreenState extends ConsumerState<QuestionInputScreen> {
               FilledButton.icon(
                 onPressed: _goToNextStep,
                 icon: const Icon(Icons.arrow_forward),
-                label: const Text('Continue'),
+                label: Text(language == AppLanguage.ko ? '다음으로' : 'Continue'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => context.go('/'),
+                icon: const Icon(Icons.home_outlined),
+                label: Text(language == AppLanguage.ko ? '메인으로 이동' : 'Go Home'),
               ),
             ],
           ),

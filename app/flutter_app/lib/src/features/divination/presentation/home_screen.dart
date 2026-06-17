@@ -1,30 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../core/localization/app_language.dart';
+import '../../../core/widgets/page_index_card.dart';
 import '../application/divination_providers.dart';
 import '../domain/divination_type.dart';
+import 'divination_localizations.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final language = ref.watch(appLanguageProvider);
     final types = ref.watch(divinationTypesProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('점술'),
+        title: Text(localizedDivinationTitle(language)),
         actions: [
+          PopupMenuButton<AppLanguage>(
+            initialValue: language,
+            tooltip: language == AppLanguage.ko ? '언어 선택' : 'Choose language',
+            onSelected: (value) {
+              ref.read(appLanguageProvider.notifier).state = value;
+            },
+            itemBuilder: (context) => [
+              for (final value in AppLanguage.values)
+                PopupMenuItem<AppLanguage>(
+                  value: value,
+                  child: Text(value.label),
+                ),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Center(
+                child: Text(
+                  language.label,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+            ),
+          ),
           IconButton(
-            tooltip: '기록',
+            tooltip: language == AppLanguage.ko ? '기록' : 'History',
             onPressed: () => context.push('/history'),
             icon: const Icon(Icons.history),
           ),
           IconButton(
-            tooltip: '플러스',
+            tooltip: language == AppLanguage.ko ? '플러스' : 'Plus',
             onPressed: () => context.push('/plus'),
             icon: const Icon(Icons.auto_awesome),
+          ),
+          IconButton(
+            tooltip: language == AppLanguage.ko ? '설정' : 'Settings',
+            onPressed: () => context.push('/settings'),
+            icon: const Icon(Icons.settings_outlined),
           ),
         ],
       ),
@@ -32,20 +65,31 @@ class HomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            PageIndexCard(
+              index: 'main',
+              label: language == AppLanguage.ko ? '메인 화면' : 'Main screen',
+            ),
+            const SizedBox(height: 16),
             _HeroPanel(
+              language: language,
               onBrowseCatalog: () => context.push('/catalog'),
-              onStartTarot: () => context.push('/reading/tarot/question'),
+              onStartTarot: () => context.push('/reading/tarot'),
             ),
             const SizedBox(height: 24),
             Text(
-              'Featured Divinations',
+              language == AppLanguage.ko ? '추천 점술' : 'Featured Divinations',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
             types.when(
-              data: (items) => _FeaturedDivinations(types: items.take(3).toList()),
+              data: (items) => _FeaturedDivinations(
+                types: items.take(3).toList(),
+                language: language,
+              ),
               error: (error, stackTrace) => _InfoCard(
-                title: 'Failed to load divinations',
+                title: language == AppLanguage.ko
+                    ? '점술 목록을 불러오지 못했습니다.'
+                    : 'Failed to load divinations',
                 body: '$error',
               ),
               loading: () => const Padding(
@@ -54,16 +98,24 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
-            const _InfoCard(
-              title: 'Reading Flow',
-              body:
-                  'Choose a divination, enter your question, review the free reading first, and expand to Plus AI when you want a deeper personalized interpretation.',
+            _InfoCard(
+              title: language == AppLanguage.ko ? '이용 흐름' : 'Reading Flow',
+              body: language == AppLanguage.ko
+                  ? '점술을 선택하고 질문을 입력한 뒤, 무료 해석을 먼저 보고 더 깊은 개인화 해석이 필요할 때 Plus AI로 확장할 수 있습니다.'
+                  : 'Choose a divination, enter your question, review the free reading first, and expand to Plus AI when you want a deeper personalized interpretation.',
             ),
             const SizedBox(height: 16),
-            const _InfoCard(
-              title: 'Settings',
-              body:
-                  'Open Settings to review version, build mode, and runtime configuration before testing.',
+            FutureBuilder<PackageInfo>(
+              future: PackageInfo.fromPlatform(),
+              builder: (context, snapshot) {
+                final packageInfo = snapshot.data;
+                return _InfoCard(
+                  title: language == AppLanguage.ko ? '앱 버전' : 'App Version',
+                  body: packageInfo == null
+                      ? (language == AppLanguage.ko ? '불러오는 중...' : 'Loading...')
+                      : 'Version ${packageInfo.version} (${packageInfo.buildNumber})',
+                );
+              },
             ),
           ],
         ),
@@ -74,10 +126,12 @@ class HomeScreen extends ConsumerWidget {
 
 class _HeroPanel extends StatelessWidget {
   const _HeroPanel({
+    required this.language,
     required this.onBrowseCatalog,
     required this.onStartTarot,
   });
 
+  final AppLanguage language;
   final VoidCallback onBrowseCatalog;
   final VoidCallback onStartTarot;
 
@@ -104,12 +158,16 @@ class _HeroPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'What kind of reading do you want today?',
+              language == AppLanguage.ko
+                  ? '오늘은 어떤 점술로 흐름을 볼까요?'
+                  : 'What kind of reading do you want today?',
               style: theme.textTheme.headlineSmall,
             ),
             const SizedBox(height: 12),
             Text(
-              'Tarot, Saju, Rune, Omikuji, and Zodiac now follow the same reading flow so each type can expand cleanly from the same app structure.',
+              language == AppLanguage.ko
+                  ? '타로, 사주, 룬, 오미쿠지, 별자리를 같은 흐름에서 선택하고 진행할 수 있도록 앱 구조를 맞추고 있습니다.'
+                  : 'Tarot, Saju, Rune, Omikuji, and Zodiac now follow the same reading flow so each type can expand cleanly from the same app structure.',
               style: theme.textTheme.bodyLarge,
             ),
             const SizedBox(height: 20),
@@ -120,12 +178,18 @@ class _HeroPanel extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: onBrowseCatalog,
                   icon: const Icon(Icons.explore),
-                  label: const Text('Browse Divinations'),
+                  label: Text(
+                    language == AppLanguage.ko
+                        ? '점술 선택하기'
+                        : 'Browse Divinations',
+                  ),
                 ),
                 OutlinedButton.icon(
                   onPressed: onStartTarot,
                   icon: const Icon(Icons.style),
-                  label: const Text('Start Tarot'),
+                  label: Text(
+                    language == AppLanguage.ko ? '바로 타로 보기' : 'Start Tarot',
+                  ),
                 ),
               ],
             ),
@@ -137,23 +201,31 @@ class _HeroPanel extends StatelessWidget {
 }
 
 class _FeaturedDivinations extends StatelessWidget {
-  const _FeaturedDivinations({required this.types});
+  const _FeaturedDivinations({
+    required this.types,
+    required this.language,
+  });
 
   final List<DivinationType> types;
+  final AppLanguage language;
 
   @override
   Widget build(BuildContext context) {
     if (types.isEmpty) {
-      return const _InfoCard(
-        title: 'No divinations available',
-        body: 'Active divinations will appear here once they are configured.',
+      return _InfoCard(
+        title: language == AppLanguage.ko
+            ? '준비된 점술이 없습니다.'
+            : 'No divinations available',
+        body: language == AppLanguage.ko
+            ? '활성화된 점술이 등록되면 여기서 바로 선택할 수 있습니다.'
+            : 'Active divinations will appear here once they are configured.',
       );
     }
 
     return Column(
       children: [
         for (final type in types) ...[
-          _DivinationPreviewCard(type: type),
+          _DivinationPreviewCard(type: type, language: language),
           if (type != types.last) const SizedBox(height: 12),
         ],
       ],
@@ -162,9 +234,13 @@ class _FeaturedDivinations extends StatelessWidget {
 }
 
 class _DivinationPreviewCard extends StatelessWidget {
-  const _DivinationPreviewCard({required this.type});
+  const _DivinationPreviewCard({
+    required this.type,
+    required this.language,
+  });
 
   final DivinationType type;
+  final AppLanguage language;
 
   @override
   Widget build(BuildContext context) {
@@ -194,12 +270,13 @@ class _DivinationPreviewCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(type.displayName, style: theme.textTheme.titleMedium),
+                  Text(
+                    localizedDivinationDisplayName(type, language),
+                    style: theme.textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 4),
                   Text(
-                    type.shortDescription ??
-                        type.description ??
-                        'Description is being prepared.',
+                    localizedDivinationSummary(type, language),
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 8),
@@ -207,8 +284,15 @@ class _DivinationPreviewCard extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _Pill(label: _inputModeLabel(type.inputMode)),
-                      if (type.isPlusOnly) const _Pill(label: 'Plus only'),
+                      _Pill(
+                        label: localizedInputModePill(type.inputMode, language),
+                      ),
+                      if (type.isPlusOnly)
+                        _Pill(
+                          label: language == AppLanguage.ko
+                              ? 'Plus 전용'
+                              : 'Plus only',
+                        ),
                     ],
                   ),
                 ],
@@ -292,11 +376,3 @@ IconData _typeIcon(DivinationType type) {
   };
 }
 
-String _inputModeLabel(String inputMode) {
-  return switch (inputMode) {
-    'draw_based' => 'draw-based',
-    'birth_data_based' => 'birth-data',
-    'hybrid' => 'hybrid',
-    _ => 'other',
-  };
-}

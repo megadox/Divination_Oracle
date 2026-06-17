@@ -1,4 +1,5 @@
 import '../../features/divination/domain/reading_detail.dart';
+import '../../core/localization/app_language.dart';
 import 'divination_definition.dart';
 import 'divination_registry.dart';
 import 'reading_result_section.dart';
@@ -29,7 +30,7 @@ class ReadingResultModel {
   final String? fallbackText;
 }
 
-ReadingResultModel mapReadingResult(ReadingDetail detail) {
+ReadingResultModel mapReadingResult(ReadingDetail detail, AppLanguage language) {
   final definition = DivinationRegistry.instance.forCode(detail.divinationCode);
   final resultJson = detail.reading.resultJson ?? const <String, dynamic>{};
   final summary = _asString(resultJson['summary']);
@@ -43,8 +44,9 @@ ReadingResultModel mapReadingResult(ReadingDetail detail) {
   return ReadingResultModel(
     detail: detail,
     definition: definition,
-    displayModeLabel:
-        detail.reading.resultType == 'plus_ai' ? 'Plus AI Reading' : 'Free Reading',
+    displayModeLabel: detail.reading.resultType == 'plus_ai'
+        ? (language == AppLanguage.ko ? 'Plus AI 해석' : 'Plus AI Reading')
+        : (language == AppLanguage.ko ? '무료 해석' : 'Free Reading'),
     hero: definition.buildHero(detail),
     sections: definition.buildResultSections(detail),
     summary: summary,

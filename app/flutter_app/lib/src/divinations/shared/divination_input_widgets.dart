@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/usage_limits.dart';
+import '../../core/localization/app_language.dart';
+import '../../core/widgets/page_index_card.dart';
 import '../../features/divination/domain/daily_usage.dart';
 import 'divination_input_definition.dart';
 
@@ -24,12 +26,17 @@ class DivinationInputScaffold extends StatelessWidget {
         title: Text(title),
         actions: [
           IconButton(
-            tooltip: 'History',
+            tooltip: contextData.language == AppLanguage.ko ? '홈' : 'Home',
+            onPressed: contextData.onOpenHome,
+            icon: const Icon(Icons.home_outlined),
+          ),
+          IconButton(
+            tooltip: contextData.language == AppLanguage.ko ? '기록' : 'History',
             onPressed: contextData.onOpenHistory,
             icon: const Icon(Icons.history),
           ),
           IconButton(
-            tooltip: 'Plus',
+            tooltip: contextData.language == AppLanguage.ko ? '플러스' : 'Plus',
             onPressed: contextData.onOpenPlus,
             icon: const Icon(Icons.auto_awesome),
           ),
@@ -38,7 +45,16 @@ class DivinationInputScaffold extends StatelessWidget {
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
-          children: children,
+          children: [
+            PageIndexCard(
+              index: 'p_3',
+              label: contextData.language == AppLanguage.ko
+                  ? '질문 + 점술 입력'
+                  : 'Question + divination input',
+            ),
+            const SizedBox(height: 16),
+            ...children,
+          ],
         ),
       ),
     );
@@ -47,20 +63,15 @@ class DivinationInputScaffold extends StatelessWidget {
 
 class CommonReadingSummaryCard extends StatelessWidget {
   const CommonReadingSummaryCard({
-    required this.question,
-    required this.category,
-    required this.useAi,
-    required this.onEdit,
+    required this.contextData,
     super.key,
   });
 
-  final String question;
-  final String category;
-  final bool useAi;
-  final VoidCallback onEdit;
+  final DivinationInputContext contextData;
 
   @override
   Widget build(BuildContext context) {
+    final language = contextData.language;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -71,23 +82,73 @@ class CommonReadingSummaryCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Reading Setup',
+                    language == AppLanguage.ko
+                        ? '질문과 해석 설정'
+                        : 'Question and reading setup',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit'),
-                ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text('Mode: ${useAi ? 'Plus AI' : 'Free'}'),
-            Text('Category: $category'),
-            const SizedBox(height: 8),
-            Text(
-              question.trim().isEmpty ? 'Question: none' : 'Question: $question',
+            const SizedBox(height: 12),
+            TextField(
+              controller: contextData.questionController,
+              minLines: 2,
+              maxLines: 4,
+              onChanged: contextData.onQuestionChanged,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                labelText: language == AppLanguage.ko ? '질문' : 'Question',
+                hintText: language == AppLanguage.ko
+                    ? '일반 흐름만 보고 싶다면 비워둘 수 있습니다.'
+                    : 'You can leave this blank if you want a general reading.',
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: contextData.category,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                labelText: language == AppLanguage.ko ? '카테고리' : 'Category',
+              ),
+              items: [
+                DropdownMenuItem(
+                  value: 'general',
+                  child: Text(language == AppLanguage.ko ? '일반' : 'General'),
+                ),
+                DropdownMenuItem(
+                  value: 'love',
+                  child: Text(language == AppLanguage.ko ? '연애' : 'Love'),
+                ),
+                DropdownMenuItem(
+                  value: 'career',
+                  child: Text(language == AppLanguage.ko ? '직업' : 'Career'),
+                ),
+                DropdownMenuItem(
+                  value: 'money',
+                  child: Text(language == AppLanguage.ko ? '금전' : 'Money'),
+                ),
+                DropdownMenuItem(
+                  value: 'health',
+                  child: Text(language == AppLanguage.ko ? '건강' : 'Health'),
+                ),
+                DropdownMenuItem(
+                  value: 'relationship',
+                  child: Text(language == AppLanguage.ko ? '관계' : 'Relationship'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  contextData.onCategoryChanged(value);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            ReadingModeSelector(
+              useAi: contextData.useAi,
+              onChanged: contextData.onUseAiChanged,
+              freeLabel: language == AppLanguage.ko ? '무료' : 'Free',
+              aiLabel: 'AI',
             ),
           ],
         ),
@@ -98,11 +159,13 @@ class CommonReadingSummaryCard extends StatelessWidget {
 
 class DailyUsageBanner extends StatelessWidget {
   const DailyUsageBanner({
+    required this.language,
     required this.usage,
     required this.useAi,
     super.key,
   });
 
+  final AppLanguage language;
   final AsyncValue<DailyUsage> usage;
   final bool useAi;
 
@@ -115,17 +178,19 @@ class DailyUsageBanner extends StatelessWidget {
     return usage.when(
       data: (value) {
         if (!UsageLimits.isFreeReadingLimitEnabled) {
-          return const Card(
+          return Card(
             margin: EdgeInsets.zero,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  Icon(Icons.developer_mode, size: 20),
-                  SizedBox(width: 12),
+                  const Icon(Icons.developer_mode, size: 20),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Free reading daily limit is disabled in development mode.',
+                      language == AppLanguage.ko
+                          ? '개발 모드에서는 무료 해석 일일 제한이 비활성화되어 있습니다.'
+                          : 'Free reading daily limit is disabled in development mode.',
                     ),
                   ),
                 ],
@@ -150,8 +215,12 @@ class DailyUsageBanner extends StatelessWidget {
                 Expanded(
                   child: Text(
                     isLimitReached
-                        ? 'Today\'s free reading limit (${UsageLimits.freeDailyReadingLimit}) has been reached.'
-                        : 'Remaining free readings today: $remaining/${UsageLimits.freeDailyReadingLimit}',
+                        ? (language == AppLanguage.ko
+                              ? '오늘 무료 해석 ${UsageLimits.freeDailyReadingLimit}회를 모두 사용했습니다.'
+                              : 'Today\'s free reading limit (${UsageLimits.freeDailyReadingLimit}) has been reached.')
+                        : (language == AppLanguage.ko
+                              ? '오늘 남은 무료 해석: $remaining/${UsageLimits.freeDailyReadingLimit}'
+                              : 'Remaining free readings today: $remaining/${UsageLimits.freeDailyReadingLimit}'),
                   ),
                 ),
               ],
@@ -225,7 +294,7 @@ class DatePickerField extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: Text(value ?? 'Tap to select'),
+              child: Text(value ?? (_isKorean(context) ? '선택해 주세요' : 'Tap to select')),
             ),
             const Icon(Icons.calendar_today),
           ],
@@ -260,7 +329,7 @@ class TimePickerField extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: Text(value ?? 'Tap to select'),
+              child: Text(value ?? (_isKorean(context) ? '선택해 주세요' : 'Tap to select')),
             ),
             const Icon(Icons.access_time),
           ],
@@ -268,4 +337,9 @@ class TimePickerField extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _isKorean(BuildContext context) {
+  final scope = ProviderScope.containerOf(context, listen: false);
+  return scope.read(appLanguageProvider) == AppLanguage.ko;
 }
