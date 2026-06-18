@@ -25,7 +25,7 @@ class DivinationReadingScreen extends ConsumerStatefulWidget {
 
 class _DivinationReadingScreenState
     extends ConsumerState<DivinationReadingScreen> {
-  final _questionController = TextEditingController();
+  late final TextEditingController _questionController;
   final _sajuNameController = TextEditingController();
   final _zodiacNameController = TextEditingController();
 
@@ -38,6 +38,13 @@ class _DivinationReadingScreenState
   var _sajuBirthTimeUnknown = false;
   DateTime? _zodiacBirthDate;
   var _runeDrawCount = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    final draft = ref.read(readingFlowControllerProvider(widget.divinationCode));
+    _questionController = TextEditingController(text: draft.question);
+  }
 
   @override
   void dispose() {
@@ -72,7 +79,7 @@ class _DivinationReadingScreenState
       usage: usage,
       useAi: draft.useAi,
       question: draft.question,
-      questionController: _questionController..text = draft.question,
+      questionController: _questionController,
       isSubmitting: _isSubmitting,
       canSubmit: canSubmit,
       isFreeLimitReached: isFreeLimitReached,
